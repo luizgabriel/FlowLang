@@ -9,7 +9,7 @@ use nom::{
     character::complete::{alpha1, alphanumeric1, digit1, multispace0},
     combinator::{map, map_res, recognize, value},
     error::{context, ContextError, FromExternalError, ParseError},
-    multi::{many0_count, many1},
+    multi::{many0, many0_count},
     sequence::{delimited, pair, tuple},
     IResult, InputLength, Parser,
 };
@@ -65,14 +65,16 @@ where
 
 fn infixr_expr<I, E, F, G, H>(op: F, lhs: G, rhs: H) -> impl FnMut(I) -> IResult<I, Expr, E>
 where
-    I: Clone + PartialEq,
+    I: Clone + PartialEq + InputLength,
     E: ParseError<I>,
     F: Parser<I, OpKind, E>,
     G: Parser<I, Expr, E>,
     H: Parser<I, Expr, E>,
 {
-    map(tuple((lhs, op, rhs)), |(lhs, op, rhs)| {
-        Expr::binop(op, lhs, rhs)
+    map(tuple((lhs, many0(pair(op, rhs)))), |(lhs, rhs_list)| {
+        rhs_list
+            .into_iter()
+            .rfold(lhs, |lhs, (op, rhs)| Expr::binop(op, lhs, rhs))
     })
 }
 
@@ -84,7 +86,7 @@ where
     G: Parser<I, Expr, E>,
     H: Parser<I, Expr, E>,
 {
-    map(tuple((lhs, many1(pair(op, rhs)))), |(lhs, rhs_list)| {
+    map(tuple((lhs, many0(pair(op, rhs)))), |(lhs, rhs_list)| {
         rhs_list
             .into_iter()
             .fold(lhs, |lhs, (op, rhs)| Expr::binop(op, lhs, rhs))
@@ -170,10 +172,7 @@ where
 {
     context(
         "expr12",
-        alt((
-            infixl_expr(ws(alt((op_mul, op_div))), fw_expr13, fw_expr13),
-            fw_expr13,
-        )),
+        alt((prefix_expr(ws(op_minus), fw_expr13), fw_expr13)),
     )(input)
 }
 
@@ -183,10 +182,7 @@ where
 {
     context(
         "expr11",
-        alt((
-            infixl_expr(ws(alt((op_plus, op_minus))), fw_expr12, fw_expr12),
-            fw_expr12,
-        )),
+        infixl_expr(ws(alt((op_mul, op_div))), fw_expr12, fw_expr12),
     )(input)
 }
 
@@ -196,14 +192,7 @@ where
 {
     context(
         "expr10",
-        alt((
-            infixl_expr(
-                ws(alt((op_lt, op_gt, op_lte, op_gte))),
-                fw_expr11,
-                fw_expr11,
-            ),
-            fw_expr11,
-        )),
+        infixl_expr(ws(alt((op_plus, op_minus))), fw_expr11, fw_expr11),
     )(input)
 }
 
@@ -213,12 +202,14 @@ where
 {
     context(
         "expr9",
-        alt((
-            prefix_expr(ws(op_minus), fw_expr10),
+        infixl_expr(
+            ws(alt((op_lt, op_gt, op_lte, op_gte))),
             fw_expr10,
-        )),
+            fw_expr10,
+        ),
     )(input)
 }
+
 
 pub fn fw_expr<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
@@ -265,9 +256,22 @@ mod tests {
         assert_parse!(" -foo", Expr::unop(OpKind::Sub, Expr::ident("foo")));
         assert_parse!("(-42) ", Expr::unop(OpKind::Sub, Expr::literal(42)));
         assert_parse!("(- 42)", Expr::unop(OpKind::Sub, Expr::literal(42)));
-        assert_parse!("(-x^2)", Expr::unop(OpKind::Sub, 
-            Expr::binop(OpKind::Pow, Expr::ident("x"), Expr::literal(2))
-        ));
+        assert_parse!(
+            "(-x^2)",
+            Expr::unop(
+                OpKind::Sub,
+                Expr::binop(OpKind::Pow, Expr::ident("x"), Expr::literal(2))
+            )
+        );
+
+        assert_parse!(
+            "x + -2*y",
+            Expr::binop(
+                OpKind::Add,
+                Expr::ident("x"),
+                Expr::binop(OpKind::Mul, Expr::unop(OpKind::Sub, Expr::literal(2)), Expr::ident("y"))
+            )
+        );
     }
 
     #[test]
@@ -374,10 +378,7 @@ mod tests {
                     Expr::binop(
                         OpKind::Pow,
                         Expr::ident("foo"),
-                        Expr::binop(OpKind::Pow, 
-                            Expr::ident("bar"), 
-                            Expr::ident("baz")
-                        )
+                        Expr::binop(OpKind::Pow, Expr::ident("bar"), Expr::ident("baz"))
                     ),
                 ),
                 Expr::ident("baz")
@@ -389,7 +390,7 @@ mod tests {
 fn main() {
     println!(
         "{:#?}",
-        fw_expr::<nom::error::VerboseError<&str>>("(-x^2)")
+        fw_expr::<nom::error::VerboseError<&str>>("x + -2*y")
             .unwrap()
             .1
     );
