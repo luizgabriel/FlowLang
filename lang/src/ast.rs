@@ -42,6 +42,7 @@ pub enum OpKind {
     Lte, // <=
     Eq, // ==
     NotEq, // !=
+    Comma, // ,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,6 +90,7 @@ impl std::fmt::Display for OpKind {
             OpKind::Lte => write!(f, "<="),
             OpKind::Eq => write!(f, "=="),
             OpKind::NotEq => write!(f, "!="),
+            OpKind::Comma => write!(f, ","),
         }
     }
 }

@@ -37,6 +37,7 @@ define_token!(op_gte, ">=", OpKind, OpKind::Gte);
 define_token!(op_lte, "<=", OpKind, OpKind::Lte);
 define_token!(op_eq, "==", OpKind, OpKind::Eq);
 define_token!(op_not_eq, "!=", OpKind, OpKind::NotEq);
+define_token!(op_comma, ",", OpKind, OpKind::Comma);
 
 define_token!(literal_true, "true", LiteralValue, LiteralValue::Bool(true));
 define_token!(
@@ -139,77 +140,70 @@ fn fw_expr15<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    context(
-        "expr15",
-        alt((
-            map(ws(fw_literal), Expr::Literal),
-            map(ws(fw_identifier), Expr::Identifier),
-        )),
-    )(input)
+    alt((
+        map(ws(fw_literal), Expr::Literal),
+        map(ws(fw_identifier), Expr::Identifier),
+    ))(input)
 }
 
 fn fw_expr14<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    context("expr14", alt((ws(paren(fw_expr)), fw_expr15)))(input)
+    alt((ws(paren(fw_expr)), fw_expr15))(input)
 }
 
 fn fw_expr13<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    context(
-        "expr13",
-        alt((infixr_expr(ws(op_pow), fw_expr14, fw_expr13), fw_expr14)),
-    )(input)
+    alt((infixr_expr(ws(op_pow), fw_expr14, fw_expr13), fw_expr14))(input)
 }
 
 fn fw_expr12<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    context(
-        "expr12",
-        alt((
-            prefix_expr(ws(op_minus), fw_expr13),
-            prefix_expr(ws(op_not), fw_expr13),
-            fw_expr13,
-        )),
-    )(input)
+    alt((
+        prefix_expr(ws(op_minus), fw_expr13),
+        prefix_expr(ws(op_not), fw_expr13),
+        fw_expr13,
+    ))(input)
 }
 
 fn fw_expr11<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    context(
-        "expr11",
-        infixl_expr(ws(alt((op_mul, op_div))), fw_expr12, fw_expr12),
-    )(input)
+    infixl_expr(ws(alt((op_mul, op_div))), fw_expr12, fw_expr12)(input)
 }
 
 fn fw_expr10<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    context(
-        "expr10",
-        infixl_expr(ws(alt((op_plus, op_minus))), fw_expr11, fw_expr11),
-    )(input)
+    infixl_expr(ws(alt((op_plus, op_minus))), fw_expr11, fw_expr11)(input)
 }
 
 fn fw_expr9<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    context(
-        "expr9",
-        infixl_expr(
-            ws(alt((op_lt, op_gt, op_lte, op_gte, op_eq, op_not_eq))),
-            fw_expr10,
-            fw_expr10,
-        ),
+    infixl_expr(
+        ws(alt((op_lt, op_gt, op_lte, op_gte, op_eq, op_not_eq))),
+        fw_expr10,
+        fw_expr10,
+    )(input)
+}
+
+fn fw_expr8<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+where
+    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+{
+    infixl_expr(
+        ws(op_comma),
+        fw_expr9,
+        fw_expr9,
     )(input)
 }
 
@@ -217,10 +211,7 @@ fn fw_expr1<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    context(
-        "expr1",
-        alt((infixr_expr(ws(op_assign), fw_expr9, fw_expr9), fw_expr9)),
-    )(input)
+    alt((infixr_expr(ws(op_assign), fw_expr8, fw_expr8), fw_expr8))(input)
 }
 
 fn fw_expr<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
