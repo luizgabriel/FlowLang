@@ -136,6 +136,7 @@ where
     context("literal", alt((literal_true, literal_false, fw_number)))(input)
 }
 
+// Expr15 = literal | identifier
 fn fw_expr15<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
@@ -146,6 +147,7 @@ where
     ))(input)
 }
 
+// Expr14 = "(" Expr ")" | Expr15
 fn fw_expr14<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
@@ -153,6 +155,7 @@ where
     alt((ws(paren(fw_expr)), fw_expr15))(input)
 }
 
+// Expr13 = Expr14 [ "^" Expr14 ]*
 fn fw_expr13<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
@@ -160,6 +163,7 @@ where
     alt((infixr_expr(ws(op_pow), fw_expr14, fw_expr13), fw_expr14))(input)
 }
 
+// Expr12 =  "-" Expr13 | "!" Expr13 | Expr13
 fn fw_expr12<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
@@ -171,6 +175,7 @@ where
     ))(input)
 }
 
+// Expr11 = Expr12 [ ("*" | "/") Expr12 ]*
 fn fw_expr11<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
@@ -178,6 +183,7 @@ where
     infixl_expr(ws(alt((op_mul, op_div))), fw_expr12, fw_expr12)(input)
 }
 
+// Expr10 = Expr11 [ ("+" | "-") Expr11 ]*
 fn fw_expr10<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
@@ -185,6 +191,7 @@ where
     infixl_expr(ws(alt((op_plus, op_minus))), fw_expr11, fw_expr11)(input)
 }
 
+// Expr9 = Expr10 [ ("<" | ">" | "<=" | ">=" | "==" | "!=") Expr10 ]*
 fn fw_expr9<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
@@ -196,6 +203,7 @@ where
     )(input)
 }
 
+// Expr8 = Expr9 [ "," Expr9 ]*
 fn fw_expr8<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
@@ -207,6 +215,7 @@ where
     )(input)
 }
 
+// Expr1 = Expr8 [ "=" Expr8 ]*
 fn fw_expr1<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
@@ -214,6 +223,7 @@ where
     alt((infixr_expr(ws(op_assign), fw_expr8, fw_expr8), fw_expr8))(input)
 }
 
+// Expr = Expr1
 fn fw_expr<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,

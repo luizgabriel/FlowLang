@@ -18,7 +18,7 @@ impl std::fmt::Display for ColoredExpr {
                 f,
                 "({} {} {})",
                 ColoredExpr { expr: *lhs.clone() },
-                op,
+                op.to_string().bright_purple(),
                 ColoredExpr { expr: *rhs.clone() }
             ),
             Expr::UnOp(op, expr) => write!(
