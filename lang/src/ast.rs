@@ -27,7 +27,7 @@ impl Ident {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpKind {
     Add, // +
     Sub, // -
