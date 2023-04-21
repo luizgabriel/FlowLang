@@ -1,6 +1,6 @@
 #![feature(assert_matches)]
 
-use lang::ast::{Expr, OpKind};
+use lang::ast::Expr;
 
 macro_rules! assert_parse {
         ($input:expr, $expected:expr) => {
@@ -32,140 +32,34 @@ fn test_parse_literal() {
 }
 
 #[test]
-fn test_parse_unop() {
-    assert_parse!(" -foo", Expr::unop(OpKind::Sub, Expr::ident("foo")));
-    assert_parse!("(-42) ", Expr::unop(OpKind::Sub, Expr::literal(42)));
-    assert_parse!("(- 42)", Expr::unop(OpKind::Sub, Expr::literal(42)));
+fn test_function_application() {
     assert_parse!(
-        "(-x^2)",
-        Expr::unop(
-            OpKind::Sub,
-            Expr::binop(OpKind::Pow, Expr::ident("x"), Expr::literal(2))
+        "foo bar",
+        Expr::fnapp(Expr::ident("foo"), Expr::ident("bar"))
+    );
+    assert_parse!(
+        "foo bar baz",
+        Expr::fnapp(
+            Expr::fnapp(Expr::ident("foo"), Expr::ident("bar")),
+            Expr::ident("baz")
         )
     );
-
     assert_parse!(
-        "x + -2*y",
-        Expr::binop(
-            OpKind::Add,
-            Expr::ident("x"),
-            Expr::binop(
-                OpKind::Mul,
-                Expr::unop(OpKind::Sub, Expr::literal(2)),
-                Expr::ident("y")
-            )
+        "foo (bar baz)",
+        Expr::fnapp(
+            Expr::ident("foo"),
+            Expr::fnapp(Expr::ident("bar"), Expr::ident("baz"))
         )
     );
 }
 
 #[test]
-fn test_parse_binop() {
+fn test_operator_function_application() {
     assert_parse!(
-        "foo + bar + baz",
-        Expr::binop(
-            OpKind::Add,
-            Expr::binop(OpKind::Add, Expr::ident("foo"), Expr::ident("bar")),
-            Expr::ident("baz")
-        )
-    );
-    assert_parse!(
-        "foo - bar - baz",
-        Expr::binop(
-            OpKind::Sub,
-            Expr::binop(OpKind::Sub, Expr::ident("foo"), Expr::ident("bar")),
-            Expr::ident("baz")
-        )
-    );
-    assert_parse!(
-        "foo * bar * baz",
-        Expr::binop(
-            OpKind::Mul,
-            Expr::binop(OpKind::Mul, Expr::ident("foo"), Expr::ident("bar")),
-            Expr::ident("baz")
-        )
-    );
-    assert_parse!(
-        "foo / bar / baz",
-        Expr::binop(
-            OpKind::Div,
-            Expr::binop(OpKind::Div, Expr::ident("foo"), Expr::ident("bar")),
-            Expr::ident("baz")
-        )
-    );
-    assert_parse!(
-        "foo / (foo + bar)",
-        Expr::binop(
-            OpKind::Div,
-            Expr::ident("foo"),
-            Expr::binop(OpKind::Add, Expr::ident("foo"), Expr::ident("bar"))
-        )
-    );
-    assert_parse!(
-        "(foo + bar) / foo",
-        Expr::binop(
-            OpKind::Div,
-            Expr::binop(OpKind::Add, Expr::ident("foo"), Expr::ident("bar")),
-            Expr::ident("foo")
-        )
-    );
-}
-
-#[test]
-fn test_operator_precedence() {
-    assert_parse!(
-        "foo + bar * baz",
-        Expr::binop(
-            OpKind::Add,
-            Expr::ident("foo"),
-            Expr::binop(OpKind::Mul, Expr::ident("bar"), Expr::ident("baz"))
-        )
-    );
-    assert_parse!(
-        "foo * bar + baz",
-        Expr::binop(
-            OpKind::Add,
-            Expr::binop(OpKind::Mul, Expr::ident("foo"), Expr::ident("bar")),
-            Expr::ident("baz")
-        )
-    );
-    assert_parse!(
-        "foo + bar / baz",
-        Expr::binop(
-            OpKind::Add,
-            Expr::ident("foo"),
-            Expr::binop(OpKind::Div, Expr::ident("bar"), Expr::ident("baz"))
-        )
-    );
-    assert_parse!(
-        "foo < bar + baz",
-        Expr::binop(
-            OpKind::Lt,
-            Expr::ident("foo"),
-            Expr::binop(OpKind::Add, Expr::ident("bar"), Expr::ident("baz"))
-        )
-    );
-    assert_parse!(
-        "baz + foo < bar - foo",
-        Expr::binop(
-            OpKind::Lt,
-            Expr::binop(OpKind::Add, Expr::ident("baz"), Expr::ident("foo")),
-            Expr::binop(OpKind::Sub, Expr::ident("bar"), Expr::ident("foo")),
-        )
-    );
-    assert_parse!(
-        "foo + foo^bar^baz + baz",
-        Expr::binop(
-            OpKind::Add,
-            Expr::binop(
-                OpKind::Add,
-                Expr::ident("foo"),
-                Expr::binop(
-                    OpKind::Pow,
-                    Expr::ident("foo"),
-                    Expr::binop(OpKind::Pow, Expr::ident("bar"), Expr::ident("baz"))
-                ),
-            ),
-            Expr::ident("baz")
+        "foo + bar",
+        Expr::fnapp(
+            Expr::fnapp(Expr::operator("+"), Expr::ident("foo")),
+            Expr::ident("bar")
         )
     );
 }

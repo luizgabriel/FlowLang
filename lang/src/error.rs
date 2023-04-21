@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::ast::Expr;
+use crate::ast::{Expr, Ident, Type};
 
 #[derive(Error, Debug)]
 pub enum ParseError<'a> {
@@ -15,4 +15,25 @@ pub enum ParseError<'a> {
 
     #[error("Failed to parse expression: {}", nom::error::convert_error(*.0, .1.clone()))]
     Failure(&'a str, nom::error::VerboseError<&'a str>),
+}
+
+#[derive(Error, Debug)]
+pub enum EvalError {
+    #[error("Unbound variable: {0}")]
+    UnboundIdentifier(Ident),
+
+    #[error("Not a function: {0}")]
+    NotAFunction(Expr),
+
+    #[error("Invalid arguments: {0}")]
+    InvalidFunctionCall(Expr),
+
+    #[error("Invalid type: expected {expected:?} in {expr:?}")]
+    InvalidType { expr: Expr, expected: Type },
+
+    #[error("Division by zero")]
+    DivideByZero,
+
+    #[error("Operation Overflow")]
+    Overflow,
 }

@@ -1,25 +1,43 @@
-#[derive(Debug, Clone, PartialEq)]
+use crate::error::EvalError;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LiteralValue {
+    Unit(),
     Bool(bool),
     Int32(i32),
 }
 
-impl From<i32> for LiteralValue
-{
+#[derive(Debug, Clone, PartialEq)]
+pub enum Type {
+    Unit,
+    Int32,
+    Bool,
+}
+
+impl From<i32> for LiteralValue {
     fn from(value: i32) -> Self {
         LiteralValue::Int32(value.into())
     }
 }
 
-impl From<bool> for LiteralValue
-{
+impl From<bool> for LiteralValue {
     fn from(value: bool) -> Self {
         LiteralValue::Bool(value.into())
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Ident(String);
+impl Into<Type> for LiteralValue {
+    fn into(self) -> Type {
+        match self {
+            LiteralValue::Unit() => Type::Unit,
+            LiteralValue::Bool(_) => Type::Bool,
+            LiteralValue::Int32(_) => Type::Int32,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Ident(pub(crate) String);
 
 impl Ident {
     pub fn new(name: &str) -> Self {
@@ -27,33 +45,49 @@ impl Ident {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OpKind {
-    Add, // +
-    Sub, // -
-    Mul, // *
-    Div, // /
-    Pow, // ^
-    Assign,  // =
-    Not, // !
-    Gt, // >
-    Lt, // <
-    Gte, // >=
-    Lte, // <=
-    Eq, // ==
-    NotEq, // !=
-    Comma, // ,
+impl From<&str> for Ident {
+    fn from(name: &str) -> Self {
+        Ident::new(name)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum NativeFn {
+    Add,
+    Sub,
+    Mul,
+    Div,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    BinOp(OpKind, Box<Expr>, Box<Expr>),
-    UnOp(OpKind, Box<Expr>),
     Literal(LiteralValue),
     Identifier(Ident),
+    ConstantDefinition {
+        name: Ident,
+        value: Box<Expr>,
+    },
+    FunctionApplication(Box<Expr>, Box<Expr>),
+    FunctionDefinition {
+        name: Ident,
+        params: Vec<Ident>,
+        body: Box<Expr>,
+    },
+    NativeFunction {
+        name: NativeFn,
+        args: Vec<Expr>,
+    },
+    Lambda {
+        params: Vec<Ident>,
+        body: Box<Expr>,
+    },
 }
 
 impl Expr {
+    pub fn unit() -> Expr {
+        Expr::Literal(LiteralValue::Unit())
+    }
+
     pub fn literal<T>(value: T) -> Expr
     where
         LiteralValue: From<T>,
@@ -65,58 +99,70 @@ impl Expr {
         Expr::Identifier(Ident::new(name))
     }
 
-    pub fn binop(op: OpKind, lhs: Expr, rhs: Expr) -> Expr {
-        Expr::BinOp(op, Box::new(lhs), Box::new(rhs))
+    pub fn constdef(name: Ident, value: Expr) -> Expr {
+        Expr::ConstantDefinition {
+            name,
+            value: Box::new(value),
+        }
     }
 
-    pub fn unop(op: OpKind, expr: Expr) -> Expr {
-        Expr::UnOp(op, Box::new(expr))
+    pub fn fndef(name: Ident, params: Vec<Ident>, body: Expr) -> Expr {
+        Expr::FunctionDefinition {
+            name,
+            params,
+            body: Box::new(body),
+        }
     }
-}
 
-impl std::fmt::Display for OpKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            OpKind::Add => write!(f, "+"),
-            OpKind::Sub => write!(f, "-"),
-            OpKind::Mul => write!(f, "*"),
-            OpKind::Div => write!(f, "/"),
-            OpKind::Pow => write!(f, "^"),
-            OpKind::Assign => write!(f, "="),
-            OpKind::Not => write!(f, "!"),
-            OpKind::Gt => write!(f, ">"),
-            OpKind::Lt => write!(f, "<"),
-            OpKind::Gte => write!(f, ">="),
-            OpKind::Lte => write!(f, "<="),
-            OpKind::Eq => write!(f, "=="),
-            OpKind::NotEq => write!(f, "!="),
-            OpKind::Comma => write!(f, ","),
+    pub fn fnapp(func: Expr, arg: Expr) -> Expr {
+        Expr::FunctionApplication(Box::new(func), Box::new(arg))
+    }
+
+    pub fn lambda(params: Vec<Ident>, body: Expr) -> Expr {
+        Expr::Lambda {
+            params,
+            body: Box::new(body),
+        }
+    }
+
+    pub fn nat_fn(name: NativeFn) -> Expr {
+        Expr::NativeFunction {
+            name,
+            args: Vec::new(),
         }
     }
 }
 
-impl std::fmt::Display for LiteralValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LiteralValue::Bool(value) => write!(f, "{}", value),
-            LiteralValue::Int32(value) => write!(f, "{}", value),
+macro_rules! define_try_from_expr {
+    ($type:tt, $native_type:ty) => {
+        impl TryFrom<Expr> for $native_type {
+            type Error = EvalError;
+
+            fn try_from(expr: Expr) -> Result<Self, Self::Error> {
+                match expr {
+                    Expr::Literal(LiteralValue::$type(value)) => Ok(value),
+                    _ => Err(EvalError::InvalidType {
+                        expr,
+                        expected: Type::$type,
+                    }),
+                }
+            }
         }
-    }
+    };
 }
 
-impl std::fmt::Display for Ident {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.0)
-    }
+define_try_from_expr!(Int32, i32);
+define_try_from_expr!(Bool, bool);
+
+macro_rules! define_intro_expr {
+    ($native_type:ty) => {
+        impl Into<Expr> for $native_type {
+            fn into(self) -> Expr {
+                Expr::literal(self)
+            }
+        }
+    };
 }
 
-impl std::fmt::Display for Expr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            Expr::BinOp(op, lhs, rhs) => write!(f, "({} {} {})", lhs, op, rhs),
-            Expr::UnOp(op, expr) => write!(f, "({} {})", op, expr),
-            Expr::Literal(value) => write!(f, "{}", value),
-            Expr::Identifier(ident) => write!(f, "{}", ident),
-        }
-    }
-}
+define_intro_expr!(i32);
+define_intro_expr!(bool);

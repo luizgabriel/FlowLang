@@ -1,10 +1,8 @@
 mod error;
-mod display;
 
 use colored::Colorize;
 use error::REPLError;
-use lang::error::ParseError;
-use display::ColoredExpr;
+use lang::{error::ParseError, evaluation::Environment};
 use rustyline::{error::ReadlineError, Editor};
 
 const HISTORY_PATH: &str = ".flow_history";
@@ -34,10 +32,24 @@ fn main() {
 
     rl.load_history(HISTORY_PATH).unwrap_or_default();
 
+    let mut env = Environment::new_with_std();
+
     loop {
-        let result = read(&mut rl).and_then(|input| lang::parsing::parse(&input).map_err(ParseError::into));
+        let result =
+            read(&mut rl).and_then(|input| lang::parsing::parse(&input).map_err(ParseError::into));
         match result {
-            Ok(expr) => println!("{}", ColoredExpr::new(expr)),
+            Ok(expr) => {
+                println!("Parsed Expression: {}", expr);
+                match expr.eval(env.clone()) {
+                    Ok((result, next_env)) => {
+                        println!("Result: {}", result);
+                        env = next_env;
+                    }
+                    Err(err) => {
+                        eprintln!("{}", err);
+                    }
+                }
+            }
             Err(err) => {
                 eprintln!("{}", err);
                 match err {
