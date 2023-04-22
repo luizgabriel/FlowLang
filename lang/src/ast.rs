@@ -52,7 +52,7 @@ impl From<&str> for Ident {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum NativeFn {
+pub enum BuiltInFunc {
     Add,
     Sub,
     Mul,
@@ -73,8 +73,9 @@ pub enum Expr {
         params: Vec<Ident>,
         body: Box<Expr>,
     },
-    NativeFunction {
-        name: NativeFn,
+    BuiltInFunction {
+        name: BuiltInFunc,
+        arity: usize,
         args: Vec<Expr>,
     },
     Lambda {
@@ -125,9 +126,10 @@ impl Expr {
         }
     }
 
-    pub fn nat_fn(name: NativeFn) -> Expr {
-        Expr::NativeFunction {
+    pub fn builtin_fn(name: BuiltInFunc, arity: usize) -> Expr {
+        Expr::BuiltInFunction {
             name,
+            arity,
             args: Vec::new(),
         }
     }

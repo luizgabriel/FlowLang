@@ -39,10 +39,10 @@ fn main() {
             read(&mut rl).and_then(|input| lang::parsing::parse(&input).map_err(ParseError::into));
         match result {
             Ok(expr) => {
-                println!("Parsed Expression: {}", expr);
+                // println!("Parsed Expression: {}", expr);
                 match expr.eval(env.clone()) {
                     Ok((result, next_env)) => {
-                        println!("Result: {}", result);
+                        println!("{}", result);
                         env = next_env;
                     }
                     Err(err) => {
