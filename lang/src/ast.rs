@@ -29,6 +29,11 @@ impl From<&str> for Ident {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BuiltInFunc {
+    Eq,
+    Gt,
+    Lt,
+    Gte,
+    Lte,
     Add,
     Sub,
     Mul,
@@ -51,6 +56,16 @@ pub enum Value {
         params: Vec<Ident>,
         scope: Environment,
     },
+}
+
+impl Value {
+    pub fn builtin_2(name: BuiltInFunc) -> Value {
+        Value::BuiltInFunction {
+            name,
+            params: vec![Ident::new("lhs"), Ident::new("rhs")],
+            scope: Environment::new(),
+        }
+    }
 }
 
 impl Into<Type> for Value {

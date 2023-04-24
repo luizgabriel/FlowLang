@@ -1,7 +1,7 @@
 use rpds::HashTrieMap;
 
 use crate::{
-    ast::{BuiltInFunc, Expr, Ident, Value},
+    ast::{BuiltInFunc, Expr, Ident, Type, Value},
     error::EvalError,
 };
 
@@ -31,38 +31,15 @@ impl Environment {
 
     pub fn new_with_std() -> Self {
         Self::new()
-            .set(
-                Ident::new("+"),
-                Value::BuiltInFunction {
-                    name: BuiltInFunc::Add,
-                    params: vec![Ident::new("x"), Ident::new("y")],
-                    scope: Environment::new(),
-                },
-            )
-            .set(
-                Ident::new("-"),
-                Value::BuiltInFunction {
-                    name: BuiltInFunc::Sub,
-                    params: vec![Ident::new("x"), Ident::new("y")],
-                    scope: Environment::new(),
-                },
-            )
-            .set(
-                Ident::new("*"),
-                Value::BuiltInFunction {
-                    name: BuiltInFunc::Mul,
-                    params: vec![Ident::new("x"), Ident::new("y")],
-                    scope: Environment::new(),
-                },
-            )
-            .set(
-                Ident::new("/"),
-                Value::BuiltInFunction {
-                    name: BuiltInFunc::Div,
-                    params: vec![Ident::new("x"), Ident::new("y")],
-                    scope: Environment::new(),
-                },
-            )
+            .set(Ident::new("+"), Value::builtin_2(BuiltInFunc::Add))
+            .set(Ident::new("-"), Value::builtin_2(BuiltInFunc::Sub))
+            .set(Ident::new("*"), Value::builtin_2(BuiltInFunc::Mul))
+            .set(Ident::new("/"), Value::builtin_2(BuiltInFunc::Div))
+            .set(Ident::new("=="), Value::builtin_2(BuiltInFunc::Eq))
+            .set(Ident::new(">"), Value::builtin_2(BuiltInFunc::Gt))
+            .set(Ident::new(">="), Value::builtin_2(BuiltInFunc::Gte))
+            .set(Ident::new("<"), Value::builtin_2(BuiltInFunc::Lt))
+            .set(Ident::new("<="), Value::builtin_2(BuiltInFunc::Lte))
     }
 }
 
@@ -160,14 +137,41 @@ pub fn eval(expr: &Expr, env: Environment) -> EvalResult {
 }
 
 fn eval_builtin_function(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalError> {
-    let x: i32 = env.get(&Ident::new("x"))?.clone().try_into()?;
-    let y: i32 = env.get(&Ident::new("y"))?.clone().try_into()?;
+    let x = env.get(&Ident::new("lhs"))?;
+    let y = env.get(&Ident::new("rhs"))?;
 
-    match name {
-        BuiltInFunc::Add => Ok((x + y).into()),
-        BuiltInFunc::Sub => Ok((x - y).into()),
-        BuiltInFunc::Mul => Ok((x * y).into()),
-        BuiltInFunc::Div => Ok((x / y).into()),
+    match (name, x, y) {
+        (BuiltInFunc::Add, Value::Int32(x), Value::Int32(y)) => Ok((x + y).into()),
+        (BuiltInFunc::Add, Value::Float32(x), Value::Float32(y)) => Ok((x + y).into()),
+        (BuiltInFunc::Sub, Value::Int32(x), Value::Int32(y)) => Ok((x - y).into()),
+        (BuiltInFunc::Sub, Value::Float32(x), Value::Float32(y)) => Ok((x - y).into()),
+        (BuiltInFunc::Mul, Value::Int32(x), Value::Int32(y)) => Ok((x * y).into()),
+        (BuiltInFunc::Mul, Value::Float32(x), Value::Float32(y)) => Ok((x * y).into()),
+        (BuiltInFunc::Div, Value::Int32(x), Value::Int32(y)) => Ok((x / y).into()),
+        (BuiltInFunc::Div, Value::Float32(x), Value::Float32(y)) => Ok((x / y).into()),
+        (BuiltInFunc::Eq, Value::Int32(x), Value::Int32(y)) => Ok((x == y).into()),
+        (BuiltInFunc::Eq, Value::Float32(x), Value::Float32(y)) => Ok((x == y).into()),
+        (BuiltInFunc::Eq, Value::Bool(x), Value::Bool(y)) => Ok((x == y).into()),
+        (BuiltInFunc::Gt, Value::Int32(x), Value::Int32(y)) => Ok((x > y).into()),
+        (BuiltInFunc::Gt, Value::Float32(x), Value::Float32(y)) => Ok((x > y).into()),
+        (BuiltInFunc::Lt, Value::Int32(x), Value::Int32(y)) => Ok((x < y).into()),
+        (BuiltInFunc::Lt, Value::Float32(x), Value::Float32(y)) => Ok((x < y).into()),
+        (BuiltInFunc::Gte, Value::Int32(x), Value::Int32(y)) => Ok((x >= y).into()),
+        (BuiltInFunc::Gte, Value::Float32(x), Value::Float32(y)) => Ok((x >= y).into()),
+        (BuiltInFunc::Lte, Value::Int32(x), Value::Int32(y)) => Ok((x <= y).into()),
+        (BuiltInFunc::Lte, Value::Float32(x), Value::Float32(y)) => Ok((x <= y).into()),
+        (_, Value::Int32(_), y) => Err(EvalError::InvalidType {
+            value: y.clone(),
+            expected: Type::Int32,
+        }),
+        (_, Value::Float32(_), y) => Err(EvalError::InvalidType {
+            value: y.clone(),
+            expected: Type::Float32,
+        }),
+        (_, x, _) => Err(EvalError::InvalidType {
+            value: x.clone(),
+            expected: Type::Int32,
+        }),
     }
 }
 
