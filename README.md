@@ -21,17 +21,29 @@ Run the REPL (Read Evaluate Parse Loop) with:
 cargo run --bin repl -q
 ```
 
-Example Syntax:
+## Example Syntax:
+
+### Function Definition & Application
 
 ```hs
 square x = x * x
 hypotenuse cat1 cat2 = square x + square y
 
 hypotenuse 3 4
+```
 
-add_five = (+) 5
-add_five 10
+### Operator Functions Definitions & Application
 
+```hs
 (**) x y = hypotenuse x y
 3 + (5 ** 6) / 2
+```
+
+### Piping Operator
+
+```hs
+add5 = (+) 5
+times2 = (*) 2
+
+7 |> times2 |> add5
 ```

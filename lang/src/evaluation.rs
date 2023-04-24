@@ -40,6 +40,14 @@ impl Environment {
             .set(Ident::new(">="), Value::builtin_2(BuiltInFunc::Gte))
             .set(Ident::new("<"), Value::builtin_2(BuiltInFunc::Lt))
             .set(Ident::new("<="), Value::builtin_2(BuiltInFunc::Lte))
+            .set(
+                Ident::new("|>"),
+                Value::Function {
+                    params: vec![Ident::new("a"), Ident::new("f")],
+                    body: Box::new(Expr::fnapp(Expr::ident("f"), Expr::ident("a"))),
+                    scope: Environment::new(),
+                },
+            )
     }
 }
 
