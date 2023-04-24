@@ -1,39 +1,15 @@
-use crate::error::EvalError;
+use crate::{error::EvalError, evaluation::Environment};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LiteralValue {
-    Unit(),
-    Bool(bool),
-    Int32(i32),
-}
+pub enum LiteralValue {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Unit,
     Int32,
+    Float32,
     Bool,
-}
-
-impl From<i32> for LiteralValue {
-    fn from(value: i32) -> Self {
-        LiteralValue::Int32(value.into())
-    }
-}
-
-impl From<bool> for LiteralValue {
-    fn from(value: bool) -> Self {
-        LiteralValue::Bool(value.into())
-    }
-}
-
-impl Into<Type> for LiteralValue {
-    fn into(self) -> Type {
-        match self {
-            LiteralValue::Unit() => Type::Unit,
-            LiteralValue::Bool(_) => Type::Bool,
-            LiteralValue::Int32(_) => Type::Int32,
-        }
-    }
+    Function,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -60,8 +36,47 @@ pub enum BuiltInFunc {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Value {
+    Unit(),
+    Bool(bool),
+    Int32(i32),
+    Float32(f32),
+    Function {
+        params: Vec<Ident>,
+        body: Box<Expr>,
+        scope: Environment,
+    },
+    BuiltInFunction {
+        name: BuiltInFunc,
+        params: Vec<Ident>,
+        scope: Environment,
+    },
+}
+
+impl Into<Type> for Value {
+    fn into(self) -> Type {
+        match self {
+            Value::Unit() => Type::Unit,
+            Value::Bool(_) => Type::Bool,
+            Value::Int32(_) => Type::Int32,
+            Value::Float32(_) => Type::Float32,
+            Value::BuiltInFunction {
+                name: _,
+                params: _,
+                scope: _,
+            } => Type::Function,
+            Value::Function {
+                params: _,
+                body: _,
+                scope: _,
+            } => Type::Function,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Literal(LiteralValue),
+    Literal(Value),
     Identifier(Ident),
     ConstantDefinition {
         name: Ident,
@@ -73,11 +88,6 @@ pub enum Expr {
         params: Vec<Ident>,
         body: Box<Expr>,
     },
-    BuiltInFunction {
-        name: BuiltInFunc,
-        arity: usize,
-        args: Vec<Expr>,
-    },
     Lambda {
         params: Vec<Ident>,
         body: Box<Expr>,
@@ -86,14 +96,14 @@ pub enum Expr {
 
 impl Expr {
     pub fn unit() -> Expr {
-        Expr::Literal(LiteralValue::Unit())
+        Expr::Literal(Value::Unit())
     }
 
     pub fn literal<T>(value: T) -> Expr
     where
-        LiteralValue: From<T>,
+        T: Into<Value>,
     {
-        Expr::Literal(LiteralValue::from(value))
+        Expr::Literal(value.into())
     }
 
     pub fn ident(name: &str) -> Expr {
@@ -125,46 +135,32 @@ impl Expr {
             body: Box::new(body),
         }
     }
-
-    pub fn builtin_fn(name: BuiltInFunc, arity: usize) -> Expr {
-        Expr::BuiltInFunction {
-            name,
-            arity,
-            args: Vec::new(),
-        }
-    }
 }
 
-macro_rules! define_try_from_expr {
+macro_rules! define_value_conversion {
     ($type:tt, $native_type:ty) => {
-        impl TryFrom<Expr> for $native_type {
+        impl TryFrom<Value> for $native_type {
             type Error = EvalError;
 
-            fn try_from(expr: Expr) -> Result<Self, Self::Error> {
-                match expr {
-                    Expr::Literal(LiteralValue::$type(value)) => Ok(value),
+            fn try_from(value: Value) -> Result<Self, Self::Error> {
+                match value {
+                    Value::$type(value) => Ok(value),
                     _ => Err(EvalError::InvalidType {
-                        expr,
+                        value,
                         expected: Type::$type,
                     }),
                 }
             }
         }
-    };
-}
 
-define_try_from_expr!(Int32, i32);
-define_try_from_expr!(Bool, bool);
-
-macro_rules! define_intro_expr {
-    ($native_type:ty) => {
-        impl Into<Expr> for $native_type {
-            fn into(self) -> Expr {
-                Expr::literal(self)
+        impl Into<Value> for $native_type {
+            fn into(self) -> Value {
+                Value::$type(self)
             }
         }
     };
 }
 
-define_intro_expr!(i32);
-define_intro_expr!(bool);
+define_value_conversion!(Int32, i32);
+define_value_conversion!(Float32, f32);
+define_value_conversion!(Bool, bool);

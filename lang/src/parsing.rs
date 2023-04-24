@@ -1,13 +1,13 @@
-use std::num::ParseIntError;
+use std::num::{ParseFloatError, ParseIntError};
 
 use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{alpha1, alphanumeric1, digit1, multispace0, one_of},
-    combinator::{map, map_res, recognize, value},
+    combinator::{map, map_res, opt, recognize, value},
     error::{context, ContextError, FromExternalError, ParseError},
     multi::{many0_count, many1},
-    sequence::{delimited, pair, tuple},
+    sequence::{delimited, pair, separated_pair, tuple},
     IResult, Parser,
 };
 
@@ -24,14 +24,9 @@ macro_rules! define_token {
     };
 }
 
-define_token!(literal_unit, "()", LiteralValue, LiteralValue::Unit());
-define_token!(literal_true, "true", LiteralValue, LiteralValue::Bool(true));
-define_token!(
-    literal_false,
-    "false",
-    LiteralValue,
-    LiteralValue::Bool(false)
-);
+define_token!(literal_unit, "()", Value, Value::Unit());
+define_token!(literal_true, "true", Value, Value::Bool(true));
+define_token!(literal_false, "false", Value, Value::Bool(false));
 
 fn ws0<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
@@ -75,19 +70,38 @@ where
     )(input)
 }
 
-fn fw_number<'a, E>(input: &'a str) -> IResult<&'a str, LiteralValue, E>
+fn fw_number<'a, E>(input: &'a str) -> IResult<&'a str, Value, E>
 where
-    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+    E: ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>
+        + FromExternalError<&'a str, ParseFloatError>,
 {
-    context(
-        "number",
-        map(map_res(digit1, str::parse), LiteralValue::Int32),
-    )(input)
+    let float32_parser = map(
+        map_res(
+            recognize(pair(
+                opt(tag("-")),
+                separated_pair(digit1, tag("."), digit1),
+            )),
+            str::parse,
+        ),
+        Value::Float32,
+    );
+
+    let int32_parser = map(
+        map_res(recognize(pair(opt(tag("-")), digit1)), str::parse),
+        Value::Int32,
+    );
+
+    context("number", alt((float32_parser, int32_parser)))(input)
 }
 
-fn fw_literal<'a, E>(input: &'a str) -> IResult<&'a str, LiteralValue, E>
+fn fw_literal<'a, E>(input: &'a str) -> IResult<&'a str, Value, E>
 where
-    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+    E: ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>
+        + FromExternalError<&'a str, ParseFloatError>,
 {
     context("literal", alt((literal_true, literal_false, fw_number)))(input)
 }
@@ -95,7 +109,10 @@ where
 // Expr15 = literal | identifier | (operator)
 fn fw_expr15<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+    E: ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>
+        + FromExternalError<&'a str, ParseFloatError>,
 {
     alt((
         map(ws0(literal_unit), Expr::Literal),
@@ -108,7 +125,10 @@ where
 // Expr14 = "(" Expr ")" | Expr15
 fn fw_expr14<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+    E: ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>
+        + FromExternalError<&'a str, ParseFloatError>,
 {
     alt((ws0(paren(fw_expr)), fw_expr15))(input)
 }
@@ -118,7 +138,10 @@ where
 // (operator) Expr14 Expr14 ...
 fn fw_expr13<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+    E: ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>
+        + FromExternalError<&'a str, ParseFloatError>,
 {
     let fn_app = context(
         "function application",
@@ -134,7 +157,10 @@ where
 // Expr12 = Expr13 [ "Operator" Expr13 ]*
 fn fw_expr12<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+    E: ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>
+        + FromExternalError<&'a str, ParseFloatError>,
 {
     let infix_op_fn_app = context(
         "infix operator function application",
@@ -155,7 +181,10 @@ where
 // ident arg1 arg2 ... argN = expr13
 fn fw_expr11<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+    E: ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>
+        + FromExternalError<&'a str, ParseFloatError>,
 {
     let func_def = context(
         "function definition",
@@ -177,7 +206,10 @@ where
 // (x y -> x + y)
 fn fw_expr10<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+    E: ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>
+        + FromExternalError<&'a str, ParseFloatError>,
 {
     let lambda = context(
         "lambda expression",
@@ -200,7 +232,10 @@ where
 // ident = expr10
 fn fw_expr9<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+    E: ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>
+        + FromExternalError<&'a str, ParseFloatError>,
 {
     let const_def = context(
         "constant variable definition",
@@ -216,7 +251,10 @@ where
 // Expr = Expr9
 fn fw_expr<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+    E: ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>
+        + FromExternalError<&'a str, ParseFloatError>,
 {
     context("expr", fw_expr9)(input)
 }
@@ -243,7 +281,7 @@ fn assert_parsed_full<'a>(
     if str::is_empty(remainder) {
         Ok(expr)
     } else {
-        Err(error::ParseError::ExpressionNotFullyParsed(remainder, expr))
+        Err(error::ParseError::ExpressionNotFullyParsed(remainder))
     }
 }
 

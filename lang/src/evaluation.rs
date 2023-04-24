@@ -1,15 +1,13 @@
-use std::iter::once;
-
 use rpds::HashTrieMap;
 
 use crate::{
-    ast::{BuiltInFunc, Expr, Ident},
+    ast::{BuiltInFunc, Expr, Ident, Value},
     error::EvalError,
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
-    variables: HashTrieMap<String, Expr>,
+    variables: HashTrieMap<Ident, Value>,
 }
 
 impl Environment {
@@ -19,104 +17,157 @@ impl Environment {
         }
     }
 
-    pub fn get_id(&self, identifier: &Ident) -> Option<&Expr> {
-        self.get(identifier.0.as_str())
+    pub fn get(&self, identifier: &Ident) -> Result<&Value, EvalError> {
+        self.variables
+            .get(identifier)
+            .ok_or(EvalError::UnboundIdentifier(identifier.clone()))
     }
 
-    pub fn get(&self, identifier: &str) -> Option<&Expr> {
-        self.variables.get(&identifier.to_string())
-    }
-
-    pub fn set(&self, identifier: &str, value: Expr) -> Self {
+    pub fn set(&self, identifier: Ident, value: Value) -> Self {
         Environment {
-            variables: self.variables.insert(identifier.to_string(), value),
+            variables: self.variables.insert(identifier, value),
         }
-    }
-
-    pub fn set_id(&self, identifier: &Ident, value: Expr) -> Self {
-        self.set(identifier.0.as_str(), value)
     }
 
     pub fn new_with_std() -> Self {
         Self::new()
-            .set("+", Expr::builtin_fn(BuiltInFunc::Add, 2))
-            .set("-", Expr::builtin_fn(BuiltInFunc::Sub, 2))
-            .set("*", Expr::builtin_fn(BuiltInFunc::Mul, 2))
-            .set("/", Expr::builtin_fn(BuiltInFunc::Div, 2))
+            .set(
+                Ident::new("+"),
+                Value::BuiltInFunction {
+                    name: BuiltInFunc::Add,
+                    params: vec![Ident::new("x"), Ident::new("y")],
+                    scope: Environment::new(),
+                },
+            )
+            .set(
+                Ident::new("-"),
+                Value::BuiltInFunction {
+                    name: BuiltInFunc::Sub,
+                    params: vec![Ident::new("x"), Ident::new("y")],
+                    scope: Environment::new(),
+                },
+            )
+            .set(
+                Ident::new("*"),
+                Value::BuiltInFunction {
+                    name: BuiltInFunc::Mul,
+                    params: vec![Ident::new("x"), Ident::new("y")],
+                    scope: Environment::new(),
+                },
+            )
+            .set(
+                Ident::new("/"),
+                Value::BuiltInFunction {
+                    name: BuiltInFunc::Div,
+                    params: vec![Ident::new("x"), Ident::new("y")],
+                    scope: Environment::new(),
+                },
+            )
     }
 }
 
-type EvalResult = Result<(Expr, Environment), EvalError>;
+type EvalResult = Result<(Value, Environment), EvalError>;
 
 pub fn eval(expr: &Expr, env: Environment) -> EvalResult {
     match expr {
-        Expr::Identifier(ident) => {
-            let value = env
-                .get_id(ident)
-                .ok_or(EvalError::UnboundIdentifier(ident.clone()))?;
+        Expr::Literal(value) => Ok((value.clone(), env)),
 
+        Expr::Identifier(ident) => {
+            let value = env.get(ident)?;
             Ok((value.clone(), env))
         }
 
+        Expr::Lambda { params, body } => {
+            let function = Value::Function {
+                params: params.clone(),
+                body: body.clone(),
+                scope: env.clone(),
+            };
+
+            Ok((function, env))
+        }
+
         Expr::ConstantDefinition { name, value } => {
-            Ok((Expr::unit(), env.set_id(name, *value.clone())))
+            let (value, env) = value.eval(env)?;
+            Ok((Value::Unit(), env.set(name.clone(), value)))
         }
 
         Expr::FunctionApplication(lhs, rhs) => {
             let (lhs, env) = lhs.eval(env)?;
             let (rhs, env) = rhs.eval(env)?;
 
-            if let Expr::BuiltInFunction { name, arity, args } = lhs {
-                let new_args: Vec<_> = args.iter().chain(once(&rhs)).cloned().collect();
-                if new_args.len() < arity {
-                    return Ok((
-                        Expr::BuiltInFunction {
+            match lhs {
+                Value::BuiltInFunction {
+                    name,
+                    params,
+                    scope,
+                } => {
+                    let (param, rest) = params.split_first().unwrap();
+                    let scope = scope.clone().set(param.clone(), rhs);
+
+                    if rest.is_empty() {
+                        let result = eval_builtin_function(&name, &scope)?;
+                        return Ok((result, env));
+                    }
+
+                    Ok((
+                        Value::BuiltInFunction {
                             name,
-                            arity,
-                            args: new_args,
+                            params: rest.iter().cloned().collect(),
+                            scope,
                         },
                         env,
-                    ));
+                    ))
                 }
 
-                return eval_builtin_function(name, new_args, env);
-            }
-
-            let (body, param) = match lhs {
-                Expr::Lambda { params, body } => (body, params.first().cloned().unwrap()),
-                Expr::FunctionDefinition {
-                    name: _,
+                Value::Function {
                     params,
                     body,
-                } => (body, params.first().cloned().unwrap()),
-                _ => return Err(EvalError::NotAFunction(lhs.clone())),
-            };
+                    scope,
+                } => {
+                    let (param, rest) = params.split_first().unwrap();
+                    let scope = scope.clone().set(param.clone(), rhs);
 
-            let (result, _) = body.eval(env.clone().set_id(&param, rhs))?;
-            Ok((result, env))
+                    if rest.is_empty() {
+                        let (result, _) = body.eval(scope)?;
+                        return Ok((result, env));
+                    }
+
+                    Ok((
+                        Value::Function {
+                            params: rest.iter().cloned().collect(),
+                            body,
+                            scope,
+                        },
+                        env,
+                    ))
+                }
+
+                _ => Err(EvalError::NotAFunction(lhs)),
+            }
         }
 
-        Expr::FunctionDefinition {
-            name,
-            params: _,
-            body: _,
-        } => Ok((Expr::unit(), env.set_id(name, expr.clone()))),
+        Expr::FunctionDefinition { name, params, body } => {
+            let function = Value::Function {
+                params: params.clone(),
+                body: body.clone(),
+                scope: env.clone(),
+            };
 
-        _ => Ok((expr.clone(), env)),
+            Ok((Value::Unit(), env.set(name.clone(), function)))
+        }
     }
 }
 
-fn eval_builtin_function(name: BuiltInFunc, args: Vec<Expr>, env: Environment) -> EvalResult {
-    let (lhs, rhs) = (
-        i32::try_from(args.first().unwrap().clone())?,
-        i32::try_from(args.last().unwrap().clone())?,
-    );
+fn eval_builtin_function(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalError> {
+    let x: i32 = env.get(&Ident::new("x"))?.clone().try_into()?;
+    let y: i32 = env.get(&Ident::new("y"))?.clone().try_into()?;
 
     match name {
-        BuiltInFunc::Add => Ok(((lhs + rhs).into(), env)),
-        BuiltInFunc::Sub => Ok(((lhs - rhs).into(), env)),
-        BuiltInFunc::Mul => Ok(((lhs * rhs).into(), env)),
-        BuiltInFunc::Div => Ok(((lhs / rhs).into(), env)),
+        BuiltInFunc::Add => Ok((x + y).into()),
+        BuiltInFunc::Sub => Ok((x - y).into()),
+        BuiltInFunc::Mul => Ok((x * y).into()),
+        BuiltInFunc::Div => Ok((x / y).into()),
     }
 }
 

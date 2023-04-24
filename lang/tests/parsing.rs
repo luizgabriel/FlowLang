@@ -58,7 +58,7 @@ fn test_operator_function_application() {
     assert_parse!(
         "foo + bar",
         Expr::fnapp(
-            Expr::fnapp(Expr::operator("+"), Expr::ident("foo")),
+            Expr::fnapp(Expr::ident("+"), Expr::ident("foo")),
             Expr::ident("bar")
         )
     );

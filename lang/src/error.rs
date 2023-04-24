@@ -1,11 +1,11 @@
 use thiserror::Error;
 
-use crate::ast::{Expr, Ident, Type};
+use crate::ast::{Ident, Type, Value};
 
 #[derive(Error, Debug)]
 pub enum ParseError<'a> {
-    #[error("Expression not fully parsed: {1}, remaining: \"{0}\"")]
-    ExpressionNotFullyParsed(&'a str, Expr),
+    #[error("Expression not fully parsed. Remaining: \"{0}\"")]
+    ExpressionNotFullyParsed(&'a str),
 
     #[error("Invalid expression: {}", nom::error::convert_error(*.0, .1.clone()))]
     InvalidExpression(&'a str, nom::error::VerboseError<&'a str>),
@@ -23,13 +23,10 @@ pub enum EvalError {
     UnboundIdentifier(Ident),
 
     #[error("Not a function: {0}")]
-    NotAFunction(Expr),
+    NotAFunction(Value),
 
-    #[error("Invalid arguments: {0}")]
-    InvalidFunctionCall(Expr),
-
-    #[error("Invalid type: expected {expected:?} in {expr:?}")]
-    InvalidType { expr: Expr, expected: Type },
+    #[error("Invalid type: expected {expected:?} in {value:?}")]
+    InvalidType { value: Value, expected: Type },
 
     #[error("Division by zero")]
     DivideByZero,

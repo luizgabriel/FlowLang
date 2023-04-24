@@ -1,16 +1,6 @@
 use std::fmt::{Display, Error, Formatter};
 
-use crate::ast::{Expr, Ident, LiteralValue};
-
-impl Display for LiteralValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        match self {
-            LiteralValue::Unit() => write!(f, "()"),
-            LiteralValue::Bool(value) => write!(f, "{}", value),
-            LiteralValue::Int32(value) => write!(f, "{}", value),
-        }
-    }
-}
+use crate::ast::{Expr, Ident, Value};
 
 impl Display for Ident {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
@@ -18,29 +8,70 @@ impl Display for Ident {
     }
 }
 
-impl Display for Expr {
+impl Display for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         match self {
-            Expr::Literal(value) => write!(f, "{}", value),
-            Expr::Identifier(ident) => write!(f, "{}", ident),
-            Expr::ConstantDefinition { name, value } => write!(f, "{} = {}", name, value),
-            Expr::FunctionDefinition { name, params, body } => write!(
+            Value::Unit() => write!(f, "()"),
+            Value::Bool(value) => write!(f, "{}", value),
+            Value::Int32(value) => write!(f, "{}", value),
+            Value::Float32(value) => write!(f, "{}", value),
+            Value::Function {
+                params,
+                body,
+                scope: _,
+            } => write!(
                 f,
-                "{} {} = {}",
-                name,
+                "({} -> {})",
                 params
                     .iter()
                     .map(|p| p.to_string())
                     .collect::<Vec<String>>()
                     .join(" "),
-                body
+                body,
             ),
+            Value::BuiltInFunction {
+                name,
+                params,
+                scope: _,
+            } => {
+                write!(
+                    f,
+                    "({} -> <builtin-{:?}>)",
+                    params
+                        .iter()
+                        .map(|p| p.to_string())
+                        .collect::<Vec<String>>()
+                        .join(" "),
+                    name,
+                )
+            }
+        }
+    }
+}
+
+impl Display for Expr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::Literal(value) => write!(f, "{}", value),
+            Expr::Identifier(ident) => write!(f, "{}", ident),
+            Expr::ConstantDefinition { name, value } => write!(f, "{} = {}", name, value),
             Expr::FunctionApplication(lhs, rhs) => match (*lhs.clone(), *rhs.clone()) {
-                (_, Expr::FunctionApplication(_, _)) => {
-                    write!(f, "{} ({})", lhs, rhs)
-                }
+                (_, Expr::FunctionApplication(_, _)) => write!(f, "{} ({})", lhs, rhs),
                 (_, _) => write!(f, "{} {}", lhs, rhs),
             },
+            Expr::FunctionDefinition { name, params, body } => {
+                write!(
+                    f,
+                    "{} {} = {}",
+                    name,
+                    params
+                        .iter()
+                        .map(|p| p.to_string())
+                        .collect::<Vec<String>>()
+                        .join(" "),
+                    body
+                )
+            }
             Expr::Lambda { params, body } => write!(
                 f,
                 "({} -> {})",
@@ -50,16 +81,6 @@ impl Display for Expr {
                     .collect::<Vec<String>>()
                     .join(" "),
                 body
-            ),
-            Expr::BuiltInFunction { name, arity, args } => write!(
-                f,
-                "builtin <{}> {:?} [{}]",
-                arity,
-                name,
-                args.iter()
-                    .map(|a| a.to_string())
-                    .collect::<Vec<String>>()
-                    .join(" "),
             ),
         }
     }
