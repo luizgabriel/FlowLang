@@ -35,7 +35,8 @@ fn test_bultins() {
         "10 + 50" => Value::Int32(60),
         "10 - 50" => Value::Int32(-40),
         "10 / 2" => Value::Int32(5),
-        "5.0 / 2.0" => Value::Float32(2.5)
+        "5.0 / 2.0" => Value::Float32(2.5),
+        "1.1 + 2.2 - 5.0" => Value::Float32(-1.7)
     }
 }
 
