@@ -3,15 +3,15 @@
 use lang::ast::Expr;
 
 macro_rules! assert_parse {
-        ($input:expr, $expected:expr) => {
-            let result = lang::parsing::parse($input);
-            if let Err(ref e) = result {
-                println!("Parse Error: \n{}", e);
-            }
+    ($input:expr, $expected:expr) => {
+        let result = lang::parsing::parse($input);
+        if let Err(ref e) = result {
+            println!("Parse Error: \n{}", e);
+        }
 
-            std::assert_matches::assert_matches!(result, Ok(expr) if expr == $expected);
-        };
-    }
+        std::assert_matches::assert_matches!(result, Ok(expr) if expr == $expected);
+    };
+}
 
 #[test]
 fn test_parse_identifier() {

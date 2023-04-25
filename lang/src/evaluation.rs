@@ -10,47 +10,6 @@ pub struct Environment {
     variables: HashTrieMap<Ident, Value>,
 }
 
-impl Environment {
-    pub fn new() -> Self {
-        Self {
-            variables: HashTrieMap::new(),
-        }
-    }
-
-    pub fn get(&self, identifier: &Ident) -> Result<&Value, EvalError> {
-        self.variables
-            .get(identifier)
-            .ok_or(EvalError::UnboundIdentifier(identifier.clone()))
-    }
-
-    pub fn set(&self, identifier: Ident, value: Value) -> Self {
-        Environment {
-            variables: self.variables.insert(identifier, value),
-        }
-    }
-
-    pub fn new_with_std() -> Self {
-        Self::new()
-            .set(Ident::new("+"), Value::builtin_2(BuiltInFunc::Add))
-            .set(Ident::new("-"), Value::builtin_2(BuiltInFunc::Sub))
-            .set(Ident::new("*"), Value::builtin_2(BuiltInFunc::Mul))
-            .set(Ident::new("/"), Value::builtin_2(BuiltInFunc::Div))
-            .set(Ident::new("=="), Value::builtin_2(BuiltInFunc::Eq))
-            .set(Ident::new(">"), Value::builtin_2(BuiltInFunc::Gt))
-            .set(Ident::new(">="), Value::builtin_2(BuiltInFunc::Gte))
-            .set(Ident::new("<"), Value::builtin_2(BuiltInFunc::Lt))
-            .set(Ident::new("<="), Value::builtin_2(BuiltInFunc::Lte))
-            .set(
-                Ident::new("|>"),
-                Value::Function {
-                    params: vec![Ident::new("a"), Ident::new("f")],
-                    body: Box::new(Expr::fnapp(Expr::ident("f"), Expr::ident("a"))),
-                    scope: Environment::new(),
-                },
-            )
-    }
-}
-
 type EvalResult = Result<(Value, Environment), EvalError>;
 
 pub fn eval(expr: &Expr, env: Environment) -> EvalResult {
@@ -186,5 +145,46 @@ fn eval_builtin_function(name: &BuiltInFunc, env: &Environment) -> Result<Value,
 impl Expr {
     pub fn eval(&self, env: Environment) -> EvalResult {
         eval(self, env)
+    }
+}
+
+impl Environment {
+    pub fn new() -> Self {
+        Self {
+            variables: HashTrieMap::new(),
+        }
+    }
+
+    pub fn get(&self, identifier: &Ident) -> Result<&Value, EvalError> {
+        self.variables
+            .get(identifier)
+            .ok_or(EvalError::UnboundIdentifier(identifier.clone()))
+    }
+
+    pub fn set(&self, identifier: Ident, value: Value) -> Self {
+        Environment {
+            variables: self.variables.insert(identifier, value),
+        }
+    }
+
+    pub fn new_with_std() -> Self {
+        Self::new()
+            .set(Ident::new("+"), Value::builtin_2(BuiltInFunc::Add))
+            .set(Ident::new("-"), Value::builtin_2(BuiltInFunc::Sub))
+            .set(Ident::new("*"), Value::builtin_2(BuiltInFunc::Mul))
+            .set(Ident::new("/"), Value::builtin_2(BuiltInFunc::Div))
+            .set(Ident::new("=="), Value::builtin_2(BuiltInFunc::Eq))
+            .set(Ident::new(">"), Value::builtin_2(BuiltInFunc::Gt))
+            .set(Ident::new(">="), Value::builtin_2(BuiltInFunc::Gte))
+            .set(Ident::new("<"), Value::builtin_2(BuiltInFunc::Lt))
+            .set(Ident::new("<="), Value::builtin_2(BuiltInFunc::Lte))
+            .set(
+                Ident::new("|>"),
+                Value::Function {
+                    params: vec!["a".into(), "f".into()],
+                    body: Box::new(Expr::fnapp(Expr::ident("f"), Expr::ident("a"))),
+                    scope: Environment::new(),
+                },
+            )
     }
 }

@@ -1,4 +1,7 @@
-use std::num::{ParseFloatError, ParseIntError};
+use std::{
+    num::{ParseFloatError, ParseIntError},
+    str::FromStr,
+};
 
 use nom::{
     branch::alt,
@@ -70,14 +73,24 @@ where
     )(input)
 }
 
-fn fw_number<'a, E>(input: &'a str) -> IResult<&'a str, Value, E>
+fn fw_nat<'a, T, E>(input: &'a str) -> IResult<&'a str, T, E>
 where
-    E: ParseError<&'a str>
-        + ContextError<&'a str>
-        + FromExternalError<&'a str, ParseIntError>
-        + FromExternalError<&'a str, ParseFloatError>,
+    T: FromStr<Err = ParseIntError>,
+    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    let float32_parser = map(
+    context(
+        "nat",
+        map_res(recognize(pair(opt(tag("-")), digit1)), str::parse),
+    )(input)
+}
+
+fn fw_float<'a, T, E>(input: &'a str) -> IResult<&'a str, T, E>
+where
+    T: FromStr<Err = ParseFloatError>,
+    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseFloatError>,
+{
+    context(
+        "float",
         map_res(
             recognize(pair(
                 opt(tag("-")),
@@ -85,15 +98,23 @@ where
             )),
             str::parse,
         ),
-        Value::Float32,
-    );
+    )(input)
+}
 
-    let int32_parser = map(
-        map_res(recognize(pair(opt(tag("-")), digit1)), str::parse),
-        Value::Int32,
-    );
-
-    context("number", alt((float32_parser, int32_parser)))(input)
+fn fw_number<'a, E>(input: &'a str) -> IResult<&'a str, Value, E>
+where
+    E: ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>
+        + FromExternalError<&'a str, ParseFloatError>,
+{
+    context(
+        "number",
+        alt((
+            map(fw_float, Value::Float32), //
+            map(fw_nat, Value::Int32),
+        )),
+    )(input)
 }
 
 fn fw_literal<'a, E>(input: &'a str) -> IResult<&'a str, Value, E>
