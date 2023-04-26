@@ -29,8 +29,10 @@ fn test_bultins() {
         "10 + 50" => Value::Int32(60),
         "10 - 50" => Value::Int32(-40),
         "10 / 2" => Value::Int32(5),
-        "5.0 / 2.0" => Value::Float32(2.5),
-        "1.1 + 2.2 - 5.0" => Value::Float32(-1.7)
+        "e = 0.0001" => Value::Unit(),
+        "compare x y = abs (x - y) < e" => Value::Unit(),
+        "compare (5.0 / 2.0) 2.5" => Value::Bool(true),
+        "compare (1.1 + 2.2 - 5.0) -1.7" => Value::Bool(true)
     }
 }
 

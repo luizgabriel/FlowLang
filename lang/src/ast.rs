@@ -38,6 +38,7 @@ pub enum BuiltInFunc {
     Sub,
     Mul,
     Div,
+    Abs,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -59,6 +60,14 @@ pub enum Value {
 }
 
 impl Value {
+    pub fn builtin_1(name: BuiltInFunc) -> Value {
+        Value::BuiltInFunction {
+            name,
+            params: vec![Ident::new("x")],
+            scope: Environment::new(),
+        }
+    }
+
     pub fn builtin_2(name: BuiltInFunc) -> Value {
         Value::BuiltInFunction {
             name,
@@ -107,6 +116,11 @@ pub enum Expr {
         params: Vec<Ident>,
         body: Box<Expr>,
     },
+    If {
+        condition: Box<Expr>,
+        then: Box<Expr>,
+        otherwise: Box<Expr>,
+    },
 }
 
 impl Expr {
@@ -148,6 +162,14 @@ impl Expr {
         Expr::Lambda {
             params,
             body: Box::new(body),
+        }
+    }
+
+    pub fn ife(condition: Expr, then: Expr, otherwise: Expr) -> Expr {
+        Expr::If {
+            condition: Box::new(condition),
+            then: Box::new(then),
+            otherwise: Box::new(otherwise),
         }
     }
 }

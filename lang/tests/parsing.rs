@@ -2,11 +2,8 @@ use lang::ast::Expr;
 
 macro_rules! assert_parse {
     ($input:expr, $expected:expr) => {
-        let result = lang::parsing::parse($input);
-        match result {
-            Ok(expr) => assert_eq!(expr, $expected),
-            Err(e) => panic!("Parse error {}", e),
-        }
+        let expr = lang::parsing::parse($input).unwrap();
+        assert_eq!(expr, $expected);
     };
 }
 
@@ -57,6 +54,22 @@ fn test_operator_function_application() {
         Expr::fnapp(
             Expr::fnapp(Expr::ident("+"), Expr::ident("foo")),
             Expr::ident("bar")
+        )
+    );
+}
+
+#[test]
+fn test_if_expr() {
+    assert_parse!(
+        "if true then 1 else 2",
+        Expr::ife(Expr::literal(true), Expr::literal(1), Expr::literal(2))
+    );
+    assert_parse!(
+        "if false then 1 else (if false then 2 else 3)",
+        Expr::ife(
+            Expr::literal(false),
+            Expr::literal(1),
+            Expr::ife(Expr::literal(false), Expr::literal(2), Expr::literal(3))
         )
     );
 }

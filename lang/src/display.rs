@@ -82,6 +82,11 @@ impl Display for Expr {
                     .join(" "),
                 body
             ),
+            Expr::If {
+                condition,
+                then,
+                otherwise,
+            } => write!(f, "if {} then {} else {}", condition, then, otherwise),
         }
     }
 }

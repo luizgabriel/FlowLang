@@ -154,10 +154,36 @@ where
     alt((ws0(paren(fw_expr)), fw_expr15))(input)
 }
 
-// Expr14 Expr14 Expr14 ...
-// Expr14 operator Expr14 ...
-// (operator) Expr14 Expr14 ...
+// If Expression
+// Expr13 = if Expr14 then Expr14 else Expr14
 fn fw_expr13<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+where
+    E: ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>
+        + FromExternalError<&'a str, ParseFloatError>,
+{
+    let if_expr = context(
+        "if expression",
+        map(
+            tuple((
+                ws0(tag("if")),
+                fw_expr14,
+                ws0(tag("then")),
+                fw_expr14,
+                ws0(tag("else")),
+                fw_expr14,
+            )),
+            |(_, condition, _, then, _, otherwise)| Expr::ife(condition, then, otherwise),
+        ),
+    );
+
+    alt((if_expr, fw_expr14))(input)
+}
+
+// Function Application
+// Expr12 = Expr13 Expr13 Expr13 ...
+fn fw_expr12<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str>
         + ContextError<&'a str>
@@ -166,17 +192,17 @@ where
 {
     let fn_app = context(
         "function application",
-        map(tuple((fw_expr14, many1(fw_expr14))), |(head, tail)| {
+        map(tuple((fw_expr13, many1(fw_expr13))), |(head, tail)| {
             tail.into_iter().fold(head, Expr::fnapp)
         }),
     );
 
-    alt((fn_app, fw_expr14))(input)
+    alt((fn_app, fw_expr13))(input)
 }
 
 // Infix Operator Function Application
-// Expr12 = Expr13 [ "Operator" Expr13 ]*
-fn fw_expr12<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+// Expr11 = Expr12 [ "Operator" Expr12 ]*
+fn fw_expr11<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str>
         + ContextError<&'a str>
@@ -186,7 +212,7 @@ where
     let infix_op_fn_app = context(
         "infix operator function application",
         map(
-            tuple((fw_expr13, many1(pair(ws0(fw_operator), fw_expr13)))),
+            tuple((fw_expr12, many1(pair(ws0(fw_operator), fw_expr12)))),
             |(head, tail)| {
                 tail.into_iter().fold(head, |acc, (op, rhs)| {
                     Expr::fnapp(Expr::fnapp(Expr::Identifier(op), acc), rhs)
@@ -195,12 +221,33 @@ where
         ),
     );
 
-    alt((infix_op_fn_app, fw_expr13))(input)
+    alt((infix_op_fn_app, fw_expr12))(input)
 }
 
-// (Function Definition)
-// ident arg1 arg2 ... argN = expr13
-fn fw_expr11<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+// (Lambda Expressions)
+// Expr10 = (arg1 arg2 ... argN -> Expr11)
+fn fw_expr10<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+where
+    E: ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>
+        + FromExternalError<&'a str, ParseFloatError>,
+{
+    let lambda = context(
+        "lambda expression",
+        map(
+            tuple((many1(ws0(fw_identifier)), ws0(tag("->")), fw_expr11)),
+            |(args, _, body)| Expr::lambda(args, body),
+        ),
+    );
+
+    alt((lambda, fw_expr11))(input)
+}
+
+// Function Definition
+// Expr9 = ident arg1 arg2 ... argN = Expr10
+// Expr9 = (operator) arg1 arg2 ... argnN = Expr10
+fn fw_expr9<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str>
         + ContextError<&'a str>
@@ -214,44 +261,18 @@ where
                 ws0(alt((fw_identifier, paren(ws0(fw_operator))))),
                 many1(ws0(fw_identifier)),
                 ws0(tag("=")),
-                fw_expr,
+                fw_expr10,
             )),
             |(name, args, _, body)| Expr::fndef(name, args, body),
         ),
     );
 
-    alt((func_def, fw_expr12))(input)
-}
-
-// (Lambda Expressions)
-// (x y -> x + y)
-fn fw_expr10<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
-where
-    E: ParseError<&'a str>
-        + ContextError<&'a str>
-        + FromExternalError<&'a str, ParseIntError>
-        + FromExternalError<&'a str, ParseFloatError>,
-{
-    let lambda = context(
-        "lambda expression",
-        map(
-            tuple((
-                ws0(tag("(")),
-                many1(ws0(fw_identifier)),
-                ws0(tag("->")),
-                fw_expr,
-                ws0(tag(")")),
-            )),
-            |(_, args, _, body, _)| Expr::lambda(args, body),
-        ),
-    );
-
-    alt((lambda, fw_expr11))(input)
+    alt((func_def, fw_expr10))(input)
 }
 
 // Constant Variable Definition
-// ident = expr10
-fn fw_expr9<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+// ident = Expr9
+fn fw_expr8<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str>
         + ContextError<&'a str>
@@ -261,15 +282,15 @@ where
     let const_def = context(
         "constant variable definition",
         map(
-            tuple((ws0(fw_identifier), ws0(tag("=")), fw_expr)),
+            tuple((ws0(fw_identifier), ws0(tag("=")), fw_expr9)),
             |(name, _, expr)| Expr::constdef(name, expr),
         ),
     );
 
-    alt((const_def, fw_expr10))(input)
+    alt((const_def, fw_expr9))(input)
 }
 
-// Expr = Expr9
+// Expr0 = Expr8
 fn fw_expr<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str>
@@ -277,7 +298,7 @@ where
         + FromExternalError<&'a str, ParseIntError>
         + FromExternalError<&'a str, ParseFloatError>,
 {
-    context("expr", fw_expr9)(input)
+    context("expr", fw_expr8)(input)
 }
 
 fn map_nom_error<'a>(
@@ -302,7 +323,7 @@ fn assert_parsed_full<'a>(
     if str::is_empty(remainder) {
         Ok(expr)
     } else {
-        Err(error::ParseError::ExpressionNotFullyParsed(remainder))
+        Err(error::ParseError::ExpressionNotFullyParsed(expr, remainder))
     }
 }
 

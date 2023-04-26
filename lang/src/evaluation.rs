@@ -100,10 +100,40 @@ pub fn eval(expr: &Expr, env: Environment) -> EvalResult {
 
             Ok((Value::Unit(), env.set(name.clone(), function)))
         }
+
+        Expr::If {
+            condition,
+            then,
+            otherwise,
+        } => {
+            let (condition, env) = condition.eval(env)?;
+
+            match condition {
+                Value::Bool(true) => then.eval(env),
+                Value::Bool(false) => otherwise.eval(env),
+                _ => Err(EvalError::InvalidType {
+                    value: condition.clone(),
+                    expected: Type::Bool,
+                }),
+            }
+        }
     }
 }
 
-fn eval_builtin_function(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalError> {
+fn eval_abs(env: &Environment) -> Result<Value, EvalError> {
+    let x = env.get(&Ident::new("x"))?;
+
+    return match x {
+        Value::Int32(x) => Ok(x.abs().into()),
+        Value::Float32(x) => Ok(x.abs().into()),
+        _ => Err(EvalError::InvalidType {
+            value: x.clone(),
+            expected: Type::Int32,
+        }),
+    };
+}
+
+fn eval_math(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalError> {
     let x = env.get(&Ident::new("lhs"))?;
     let y = env.get(&Ident::new("rhs"))?;
 
@@ -116,6 +146,26 @@ fn eval_builtin_function(name: &BuiltInFunc, env: &Environment) -> Result<Value,
         (BuiltInFunc::Mul, Value::Float32(x), Value::Float32(y)) => Ok((x * y).into()),
         (BuiltInFunc::Div, Value::Int32(x), Value::Int32(y)) => Ok((x / y).into()),
         (BuiltInFunc::Div, Value::Float32(x), Value::Float32(y)) => Ok((x / y).into()),
+        (_, Value::Int32(_), y) => Err(EvalError::InvalidType {
+            value: y.clone(),
+            expected: Type::Int32,
+        }),
+        (_, Value::Float32(_), y) => Err(EvalError::InvalidType {
+            value: y.clone(),
+            expected: Type::Float32,
+        }),
+        (_, x, _) => Err(EvalError::InvalidType {
+            value: x.clone(),
+            expected: Type::Int32,
+        }),
+    }
+}
+
+fn eval_comparison(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalError> {
+    let x = env.get(&Ident::new("lhs"))?;
+    let y = env.get(&Ident::new("rhs"))?;
+
+    match (name, x, y) {
         (BuiltInFunc::Eq, Value::Int32(x), Value::Int32(y)) => Ok((x == y).into()),
         (BuiltInFunc::Eq, Value::Float32(x), Value::Float32(y)) => Ok((x == y).into()),
         (BuiltInFunc::Eq, Value::Bool(x), Value::Bool(y)) => Ok((x == y).into()),
@@ -139,6 +189,20 @@ fn eval_builtin_function(name: &BuiltInFunc, env: &Environment) -> Result<Value,
             value: x.clone(),
             expected: Type::Int32,
         }),
+    }
+}
+
+fn eval_builtin_function(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalError> {
+    match name {
+        BuiltInFunc::Abs => eval_abs(env),
+        BuiltInFunc::Eq
+        | BuiltInFunc::Gt
+        | BuiltInFunc::Lt
+        | BuiltInFunc::Gte
+        | BuiltInFunc::Lte => eval_comparison(name, env),
+        BuiltInFunc::Add | BuiltInFunc::Sub | BuiltInFunc::Mul | BuiltInFunc::Div => {
+            eval_math(name, env)
+        }
     }
 }
 
@@ -168,6 +232,8 @@ impl Environment {
     }
 
     pub fn new_with_std() -> Self {
+        use crate::parsing::parse;
+
         Self::new()
             .set(Ident::new("+"), Value::builtin_2(BuiltInFunc::Add))
             .set(Ident::new("-"), Value::builtin_2(BuiltInFunc::Sub))
@@ -182,9 +248,10 @@ impl Environment {
                 Ident::new("|>"),
                 Value::Function {
                     params: vec!["a".into(), "f".into()],
-                    body: Box::new(Expr::fnapp(Expr::ident("f"), Expr::ident("a"))),
+                    body: Box::new(parse("f a").unwrap()),
                     scope: Environment::new(),
                 },
             )
+            .set(Ident::new("abs"), Value::builtin_1(BuiltInFunc::Abs))
     }
 }

@@ -1,11 +1,11 @@
 use thiserror::Error;
 
-use crate::ast::{Ident, Type, Value};
+use crate::ast::{Expr, Ident, Type, Value};
 
 #[derive(Error, Debug)]
 pub enum ParseError<'a> {
-    #[error("Expression not fully parsed. Remaining: \"{0}\"")]
-    ExpressionNotFullyParsed(&'a str),
+    #[error("Expression not fully parsed: {0}, Remaining: \"{1}\"")]
+    ExpressionNotFullyParsed(Expr, &'a str),
 
     #[error("Invalid expression: {}", nom::error::convert_error(*.0, .1.clone()))]
     InvalidExpression(&'a str, nom::error::VerboseError<&'a str>),
