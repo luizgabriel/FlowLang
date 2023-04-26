@@ -39,6 +39,13 @@ max 5 -7
 min 6.8 2.7
 ```
 
+### Lambda Expressions
+
+```hs
+add1 = x -> x + 1
+add1 5
+```
+
 ## Getting Started
 
 Install the **Rust** programming language:
