@@ -25,7 +25,7 @@ pub enum EvalError {
     #[error("Not a function: {0}")]
     NotAFunction(Value),
 
-    #[error("Invalid type: expected {expected:?} got {value:?}")]
+    #[error("Invalid type: expected {expected} got {value}")]
     InvalidType { value: Value, expected: Type },
 
     #[error("Division by zero")]

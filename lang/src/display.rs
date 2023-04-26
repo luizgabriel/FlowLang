@@ -1,6 +1,6 @@
 use std::fmt::{Display, Error, Formatter};
 
-use crate::ast::{Expr, Ident, Value};
+use crate::ast::{Expr, Ident, Type, Value};
 
 impl Display for Ident {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
@@ -86,7 +86,19 @@ impl Display for Expr {
                 condition,
                 then,
                 otherwise,
-            } => write!(f, "if {} then {} else {}", condition, then, otherwise),
+            } => write!(f, "if ({}) then ({}) else ({})", condition, then, otherwise),
+        }
+    }
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::Unit => write!(f, "()"),
+            Type::Bool => write!(f, "Bool"),
+            Type::Int32 => write!(f, "Int32"),
+            Type::Float32 => write!(f, "Float32"),
+            Type::Function => write!(f, "Function"),
         }
     }
 }

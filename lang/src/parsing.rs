@@ -47,20 +47,42 @@ where
     delimited(tag("("), inner, tag(")"))
 }
 
+fn blacklist<'o, I, O, E, F>(
+    mut parser: F,
+    blacklist: &'o [O],
+) -> impl FnMut(I) -> IResult<I, O, E> + 'o
+where
+    F: Parser<I, O, E> + 'o,
+    E: ParseError<I>,
+    O: std::cmp::PartialEq,
+{
+    move |input| {
+        let (input, result) = parser.parse(input)?;
+        if blacklist.contains(&result) {
+            Err(nom::Err::Error(E::from_error_kind(
+                input,
+                nom::error::ErrorKind::Tag,
+            )))
+        } else {
+            Ok((input, result))
+        }
+    }
+}
+
 fn fw_identifier<'a, E>(input: &'a str) -> IResult<&'a str, Ident, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
-    context(
-        "identifier",
-        map(
-            recognize(pair(
-                alt((alpha1, tag("_"))),
-                many0_count(alt((alphanumeric1, tag("_")))),
-            )),
-            Ident::new,
-        ),
-    )(input)
+    let identifier = recognize(pair(
+        alt((alpha1, tag("_"))),
+        many0_count(alt((alphanumeric1, tag("_")))),
+    ));
+
+    //Dont allow keywords "if", "then" and "else"
+    const KEYWORDS: [&'static str; 3] = ["if", "then", "else"];
+    let identifier_except_keywords = blacklist(identifier, &KEYWORDS);
+
+    context("identifier", map(identifier_except_keywords, Ident::new))(input)
 }
 
 fn fw_operator<'a, E>(input: &'a str) -> IResult<&'a str, Ident, E>
