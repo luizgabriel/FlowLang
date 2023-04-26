@@ -32,8 +32,8 @@ times2 = (*) 2
 ### If Expressions
 
 ```hs
-max x y = if (x > y) then x else y
-min x y = if (x < y) then x else y
+max x y = if x > y then x else y
+min x y = if x < y then x else y
 
 max 5 -7
 min 6.8 2.7
