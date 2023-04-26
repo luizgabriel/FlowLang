@@ -29,6 +29,16 @@ times2 = (*) 2
 7 |> times2 |> add5
 ```
 
+### If Expressions
+
+```hs
+max x y = if x > y then x else y
+min x y = if x < y then x else y
+
+max 5 -7
+min 6.8 2.7
+```
+
 ## Getting Started
 
 Install the **Rust** programming language:
@@ -47,5 +57,3 @@ Run the REPL (Read Evaluate Parse Loop) with:
 ```sh
 cargo run --bin repl -q
 ```
-
-
