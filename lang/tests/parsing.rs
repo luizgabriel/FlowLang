@@ -1,15 +1,12 @@
-#![feature(assert_matches)]
-
 use lang::ast::Expr;
 
 macro_rules! assert_parse {
     ($input:expr, $expected:expr) => {
         let result = lang::parsing::parse($input);
-        if let Err(ref e) = result {
-            println!("Parse Error: \n{}", e);
+        match result {
+            Ok(expr) => assert_eq!(expr, $expected),
+            Err(e) => panic!("Parse error {}", e),
         }
-
-        std::assert_matches::assert_matches!(result, Ok(expr) if expr == $expected);
     };
 }
 

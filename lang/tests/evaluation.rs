@@ -1,5 +1,3 @@
-#![feature(assert_matches)]
-
 use lang::ast::Value;
 
 macro_rules! assert_evals {
