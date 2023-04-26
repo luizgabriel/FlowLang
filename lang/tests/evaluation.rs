@@ -12,10 +12,6 @@ macro_rules! assert_evals {
                 next_env
             });
     };
-
-    ($input:expr => $expected:expr) => {
-        assert_evals!(Environment::new_with_std(), $input => $expected);
-    };
 }
 
 #[test]
