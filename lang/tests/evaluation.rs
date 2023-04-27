@@ -61,3 +61,12 @@ fn test_pipe_operator() {
         "5 |> f |> g" => Value::Int32(12)
     }
 }
+
+#[test]
+fn test_string_concatenation() {
+    assert_evals! {
+        "s = \"foo\"" => Value::Unit(),
+        "t = \"bar\"" => Value::Unit(),
+        "s ++ t" => Value::String("foobar".to_string())
+    }
+}
