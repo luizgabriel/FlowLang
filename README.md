@@ -9,7 +9,7 @@
 
 ```hs
 square x = x * x
-hypotenuse cat1 cat2 = square x + square y
+hypotenuse x y = square x + square y
 
 hypotenuse 3 4
 ```
