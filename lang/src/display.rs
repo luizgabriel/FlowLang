@@ -15,6 +15,7 @@ impl Display for Value {
             Value::Bool(value) => write!(f, "{}", value),
             Value::Int32(value) => write!(f, "{}", value),
             Value::Float32(value) => write!(f, "{}", value),
+            Value::String(value) => write!(f, "\"{}\"", value),
             Value::Function {
                 params,
                 body,
@@ -99,6 +100,7 @@ impl Display for Type {
             Type::Int32 => write!(f, "Int32"),
             Type::Float32 => write!(f, "Float32"),
             Type::Function => write!(f, "Function"),
+            Type::String => write!(f, "String"),
         }
     }
 }

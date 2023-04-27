@@ -7,29 +7,14 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{alpha1, alphanumeric1, digit1, multispace0, one_of},
-    combinator::{map, map_res, opt, recognize, value},
+    combinator::{map, map_res, opt, recognize, value, verify},
     error::{context, ContextError, FromExternalError, ParseError},
     multi::{many0_count, many1},
     sequence::{delimited, pair, separated_pair, tuple},
     IResult, Parser,
 };
 
-use crate::{ast::*, error};
-
-macro_rules! define_token {
-    ($name:ident, $tag:expr, $out:ty, $cto:expr) => {
-        fn $name<'a, E>(input: &'a str) -> IResult<&'a str, $out, E>
-        where
-            E: ParseError<&'a str>,
-        {
-            value($cto, tag($tag))(input)
-        }
-    };
-}
-
-define_token!(literal_unit, "()", Value, Value::Unit());
-define_token!(literal_true, "true", Value, Value::Bool(true));
-define_token!(literal_false, "false", Value, Value::Bool(false));
+use crate::{ast::*, error, string::parse_string};
 
 fn ws0<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
@@ -48,25 +33,16 @@ where
 }
 
 fn blacklist<'o, I, O, E, F>(
-    mut parser: F,
+    parser: F,
     blacklist: &'o [O],
 ) -> impl FnMut(I) -> IResult<I, O, E> + 'o
 where
+    I: Clone + 'o,
     F: Parser<I, O, E> + 'o,
-    E: ParseError<I>,
+    E: ParseError<I> + 'o,
     O: std::cmp::PartialEq,
 {
-    move |input| {
-        let (input, result) = parser.parse(input)?;
-        if blacklist.contains(&result) {
-            Err(nom::Err::Error(E::from_error_kind(
-                input,
-                nom::error::ErrorKind::Tag,
-            )))
-        } else {
-            Ok((input, result))
-        }
-    }
+    verify(parser, |result| !blacklist.contains(result))
 }
 
 fn fw_identifier<'a, E>(input: &'a str) -> IResult<&'a str, Ident, E>
@@ -146,7 +122,20 @@ where
         + FromExternalError<&'a str, ParseIntError>
         + FromExternalError<&'a str, ParseFloatError>,
 {
-    context("literal", alt((literal_true, literal_false, fw_number)))(input)
+    let parse_unit = value(Value::Unit(), tag("()"));
+    let parse_true = value(Value::Bool(true), tag("true"));
+    let parse_false = value(Value::Bool(false), tag("false"));
+
+    context(
+        "literal",
+        alt((
+            parse_unit,
+            parse_true,
+            parse_false,
+            fw_number,
+            map(parse_string, Value::String),
+        )),
+    )(input)
 }
 
 // Expr15 = literal | identifier | (operator)
@@ -158,7 +147,6 @@ where
         + FromExternalError<&'a str, ParseFloatError>,
 {
     alt((
-        map(ws0(literal_unit), Expr::Literal),
         map(ws0(fw_literal), Expr::Literal),
         map(ws0(fw_identifier), Expr::Identifier),
         map(ws0(paren(fw_operator)), Expr::Identifier),

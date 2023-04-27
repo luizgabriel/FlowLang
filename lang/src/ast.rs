@@ -9,6 +9,7 @@ pub enum Type {
     Int32,
     Float32,
     Bool,
+    String,
     Function,
 }
 
@@ -39,6 +40,7 @@ pub enum BuiltInFunc {
     Mul,
     Div,
     Abs,
+    Concat,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -47,6 +49,7 @@ pub enum Value {
     Bool(bool),
     Int32(i32),
     Float32(f32),
+    String(String),
     Function {
         params: Vec<Ident>,
         body: Box<Expr>,
@@ -84,6 +87,7 @@ impl Into<Type> for Value {
             Value::Bool(_) => Type::Bool,
             Value::Int32(_) => Type::Int32,
             Value::Float32(_) => Type::Float32,
+            Value::String(_) => Type::String,
             Value::BuiltInFunction {
                 name: _,
                 params: _,
@@ -201,3 +205,4 @@ macro_rules! define_value_conversion {
 define_value_conversion!(Int32, i32);
 define_value_conversion!(Float32, f32);
 define_value_conversion!(Bool, bool);
+define_value_conversion!(String, String);

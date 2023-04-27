@@ -192,9 +192,23 @@ fn eval_comparison(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalE
     }
 }
 
+fn eval_concat(env: &Environment) -> Result<Value, EvalError> {
+    let x = env.get(&Ident::new("lhs"))?;
+    let y = env.get(&Ident::new("rhs"))?;
+
+    match (x, y) {
+        (Value::String(x), Value::String(y)) => Ok((format!("{x}{y}")).into()),
+        (x, _) => Err(EvalError::InvalidType {
+            value: x.clone(),
+            expected: Type::String,
+        }),
+    }
+}
+
 fn eval_builtin_function(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalError> {
     match name {
         BuiltInFunc::Abs => eval_abs(env),
+        BuiltInFunc::Concat => eval_concat(env),
         BuiltInFunc::Eq
         | BuiltInFunc::Gt
         | BuiltInFunc::Lt
@@ -244,6 +258,8 @@ impl Environment {
             .set(Ident::new(">="), Value::builtin_2(BuiltInFunc::Gte))
             .set(Ident::new("<"), Value::builtin_2(BuiltInFunc::Lt))
             .set(Ident::new("<="), Value::builtin_2(BuiltInFunc::Lte))
+            .set(Ident::new("++"), Value::builtin_2(BuiltInFunc::Concat))
+            .set(Ident::new("abs"), Value::builtin_1(BuiltInFunc::Abs))
             .set(
                 Ident::new("|>"),
                 Value::Function {
@@ -252,6 +268,5 @@ impl Environment {
                     scope: Environment::new(),
                 },
             )
-            .set(Ident::new("abs"), Value::builtin_1(BuiltInFunc::Abs))
     }
 }

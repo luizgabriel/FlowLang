@@ -1,4 +1,4 @@
-use lang::ast::Expr;
+use lang::ast::{Expr, Value};
 
 macro_rules! assert_parse {
     ($input:expr, $expected:expr) => {
@@ -20,9 +20,12 @@ fn test_parse_identifier() {
 
 #[test]
 fn test_parse_literal() {
+    assert_parse!("()", Expr::unit());
     assert_parse!("true", Expr::literal(true));
     assert_parse!("false", Expr::literal(false));
     assert_parse!("123", Expr::literal(123));
+    assert_parse!("123.456", Expr::literal(123.456));
+    assert_parse!("\"foo\"", Expr::literal("foo".to_string()));
 }
 
 #[test]
