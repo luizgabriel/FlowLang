@@ -1,4 +1,4 @@
-use lang::ast::{Expr, Value};
+use lang::ast::Expr;
 
 macro_rules! assert_parse {
     ($input:expr, $expected:expr) => {

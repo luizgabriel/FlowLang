@@ -1,4 +1,2 @@
 [workspace]
-name = "flow_lang"
-authors = ["Luiz Gabriel Lacerda <luizgabriel.info@gmail.com>"]
 members = ["lang", "repl"]
