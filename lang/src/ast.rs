@@ -1,4 +1,4 @@
-use crate::{error::EvalError, evaluation::Environment};
+use crate::{env::Environment, error::EvalError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LiteralValue {}

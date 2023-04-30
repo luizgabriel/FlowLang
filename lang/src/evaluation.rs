@@ -1,14 +1,8 @@
-use rpds::HashTrieMap;
-
 use crate::{
-    ast::{BuiltInFunc, Expr, Ident, Type, Value},
+    ast::{BuiltInFunc, Expr, Type, Value},
+    env::Environment,
     error::EvalError,
 };
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Environment {
-    variables: HashTrieMap<Ident, Value>,
-}
 
 type EvalResult = Result<(Value, Environment), EvalError>;
 
@@ -17,7 +11,10 @@ pub fn eval(expr: &Expr, env: Environment) -> EvalResult {
         Expr::Literal(value) => Ok((value.clone(), env)),
 
         Expr::Identifier(ident) => {
-            let value = env.get(ident)?;
+            let value = env
+                .get(ident)
+                .ok_or_else(|| EvalError::UnboundIdentifier(ident.clone()))?;
+
             Ok((value.clone(), env))
         }
 
@@ -121,7 +118,7 @@ pub fn eval(expr: &Expr, env: Environment) -> EvalResult {
 }
 
 fn eval_abs(env: &Environment) -> Result<Value, EvalError> {
-    let x = env.get(&Ident::new("x"))?;
+    let x = env.get(&"x".into()).unwrap();
 
     return match x {
         Value::Int32(x) => Ok(x.abs().into()),
@@ -134,8 +131,8 @@ fn eval_abs(env: &Environment) -> Result<Value, EvalError> {
 }
 
 fn eval_math(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalError> {
-    let x = env.get(&Ident::new("lhs"))?;
-    let y = env.get(&Ident::new("rhs"))?;
+    let x = env.get(&"lhs".into()).unwrap();
+    let y = env.get(&"rhs".into()).unwrap();
 
     match (name, x, y) {
         (BuiltInFunc::Add, Value::Int32(x), Value::Int32(y)) => Ok((x + y).into()),
@@ -162,8 +159,8 @@ fn eval_math(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalError> 
 }
 
 fn eval_comparison(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalError> {
-    let x = env.get(&Ident::new("lhs"))?;
-    let y = env.get(&Ident::new("rhs"))?;
+    let x = env.get(&"lhs".into()).unwrap();
+    let y = env.get(&"rhs".into()).unwrap();
 
     match (name, x, y) {
         (BuiltInFunc::Eq, Value::Int32(x), Value::Int32(y)) => Ok((x == y).into()),
@@ -193,8 +190,8 @@ fn eval_comparison(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalE
 }
 
 fn eval_concat(env: &Environment) -> Result<Value, EvalError> {
-    let x = env.get(&Ident::new("lhs"))?;
-    let y = env.get(&Ident::new("rhs"))?;
+    let x = env.get(&"lhs".into()).unwrap();
+    let y = env.get(&"rhs".into()).unwrap();
 
     match (x, y) {
         (Value::String(x), Value::String(y)) => Ok((format!("{x}{y}")).into()),
@@ -223,50 +220,5 @@ fn eval_builtin_function(name: &BuiltInFunc, env: &Environment) -> Result<Value,
 impl Expr {
     pub fn eval(&self, env: Environment) -> EvalResult {
         eval(self, env)
-    }
-}
-
-impl Environment {
-    pub fn new() -> Self {
-        Self {
-            variables: HashTrieMap::new(),
-        }
-    }
-
-    pub fn get(&self, identifier: &Ident) -> Result<&Value, EvalError> {
-        self.variables
-            .get(identifier)
-            .ok_or(EvalError::UnboundIdentifier(identifier.clone()))
-    }
-
-    pub fn set(&self, identifier: Ident, value: Value) -> Self {
-        Environment {
-            variables: self.variables.insert(identifier, value),
-        }
-    }
-
-    pub fn new_with_std() -> Self {
-        use crate::parsing::parse;
-
-        Self::new()
-            .set(Ident::new("+"), Value::builtin_2(BuiltInFunc::Add))
-            .set(Ident::new("-"), Value::builtin_2(BuiltInFunc::Sub))
-            .set(Ident::new("*"), Value::builtin_2(BuiltInFunc::Mul))
-            .set(Ident::new("/"), Value::builtin_2(BuiltInFunc::Div))
-            .set(Ident::new("=="), Value::builtin_2(BuiltInFunc::Eq))
-            .set(Ident::new(">"), Value::builtin_2(BuiltInFunc::Gt))
-            .set(Ident::new(">="), Value::builtin_2(BuiltInFunc::Gte))
-            .set(Ident::new("<"), Value::builtin_2(BuiltInFunc::Lt))
-            .set(Ident::new("<="), Value::builtin_2(BuiltInFunc::Lte))
-            .set(Ident::new("++"), Value::builtin_2(BuiltInFunc::Concat))
-            .set(Ident::new("abs"), Value::builtin_1(BuiltInFunc::Abs))
-            .set(
-                Ident::new("|>"),
-                Value::Function {
-                    params: vec!["a".into(), "f".into()],
-                    body: Box::new(parse("f a").unwrap()),
-                    scope: Environment::new(),
-                },
-            )
     }
 }

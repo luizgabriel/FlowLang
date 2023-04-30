@@ -6,7 +6,7 @@ macro_rules! assert_evals {
         pairs
             .iter()
             .map(|(input, expected)| (lang::parsing::parse(input).unwrap(), expected))
-            .fold(lang::evaluation::Environment::new_with_std(), |acc, (expr, expected)| -> lang::evaluation::Environment {
+            .fold(lang::env::Environment::new_with_std(), |acc, (expr, expected)| -> lang::env::Environment {
                 let (value, next_env) = lang::evaluation::eval(&expr, acc).unwrap();
                 assert_eq!(&value, expected);
                 next_env

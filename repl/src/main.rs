@@ -2,7 +2,7 @@ mod error;
 
 use colored::Colorize;
 use error::REPLError;
-use lang::{error::ParseError, evaluation::Environment};
+use lang::{env::Environment, error::ParseError};
 use rustyline::{error::ReadlineError, Editor};
 
 const HISTORY_PATH: &str = ".flow_history";
