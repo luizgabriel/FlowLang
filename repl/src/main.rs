@@ -2,24 +2,19 @@ mod error;
 
 use colored::Colorize;
 use error::REPLError;
-use lang::{env::Environment, error::ParseError};
+use lang::{
+    env::Environment,
+    error::{EvalError, ParseError},
+    evaluation::eval,
+    parsing::parse,
+};
 use rustyline::{error::ReadlineError, Editor};
 
 const HISTORY_PATH: &str = ".flow_history";
 
-fn to_readline_error(e: ReadlineError) -> REPLError {
-    match e {
-        ReadlineError::Interrupted => REPLError::ReadlineError("CTRL-C".to_string()),
-        ReadlineError::Eof => REPLError::ReadlineError("CTRL-D".to_string()),
-        err => REPLError::ReadlineError(err.to_string()),
-    }
-}
-
-pub fn read(rl: &mut Editor<()>) -> Result<String, REPLError> {
+pub fn read(rl: &mut Editor<()>) -> Result<String, ReadlineError> {
     let prompt = format!("{} ", "flow>".bright_black());
-    let input = rl.readline(&prompt).map_err(to_readline_error)?;
-
-    Ok(input)
+    rl.readline(&prompt)
 }
 
 fn main() {
@@ -35,21 +30,15 @@ fn main() {
     let mut env = Environment::new_with_std();
 
     loop {
-        let result =
-            read(&mut rl).and_then(|input| lang::parsing::parse(&input).map_err(ParseError::into));
+        let result = read(&mut rl)
+            .map_err(ReadlineError::into)
+            .and_then(|input| parse(&input).map_err(ParseError::into))
+            .and_then(|expr| eval(expr, env.clone()).map_err(EvalError::into));
 
         match result {
-            Ok(expr) => {
-                // println!("Parsed Expression: {}", expr);
-                match expr.eval(env.clone()) {
-                    Ok((result, next_env)) => {
-                        println!("{}", result);
-                        env = next_env;
-                    }
-                    Err(err) => {
-                        eprintln!("{}", err);
-                    }
-                }
+            Ok((value, next_env)) => {
+                println!("{}", value);
+                env = next_env;
             }
             Err(err) => {
                 eprintln!("{}", err);

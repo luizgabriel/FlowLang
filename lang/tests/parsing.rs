@@ -20,12 +20,12 @@ fn test_parse_identifier() {
 
 #[test]
 fn test_parse_literal() {
-    assert_parse!("()", Expr::unit());
-    assert_parse!("true", Expr::literal(true));
-    assert_parse!("false", Expr::literal(false));
-    assert_parse!("123", Expr::literal(123));
-    assert_parse!("123.456", Expr::literal(123.456));
-    assert_parse!("\"foo\"", Expr::literal("foo".to_string()));
+    assert_parse!("()", Expr::Unit);
+    assert_parse!("true", Expr::Bool(true));
+    assert_parse!("false", Expr::Bool(false));
+    assert_parse!("123", Expr::Int32(123));
+    assert_parse!("123.456", Expr::Float32(123.456));
+    assert_parse!("\"foo\"", Expr::String("foo".into()));
 }
 
 #[test]
@@ -65,14 +65,14 @@ fn test_operator_function_application() {
 fn test_if_expr() {
     assert_parse!(
         "if true then 1 else 2",
-        Expr::ife(Expr::literal(true), Expr::literal(1), Expr::literal(2))
+        Expr::ife(Expr::Bool(true), Expr::Int32(1), Expr::Int32(2))
     );
     assert_parse!(
         "if false then 1 else (if false then 2 else 3)",
         Expr::ife(
-            Expr::literal(false),
-            Expr::literal(1),
-            Expr::ife(Expr::literal(false), Expr::literal(2), Expr::literal(3))
+            Expr::Bool(false),
+            Expr::Int32(1),
+            Expr::ife(Expr::Bool(false), Expr::Int32(2), Expr::Int32(3))
         )
     );
 }

@@ -1,27 +1,31 @@
 use crate::{
-    ast::{BuiltInFunc, Expr, Type, Value},
+    ast::{BuiltInFunc, Expr, Value},
     env::Environment,
     error::EvalError,
 };
 
 type EvalResult = Result<(Value, Environment), EvalError>;
 
-pub fn eval(expr: &Expr, env: Environment) -> EvalResult {
+pub fn eval(expr: Expr, env: Environment) -> EvalResult {
     match expr {
-        Expr::Literal(value) => Ok((value.clone(), env)),
+        Expr::Unit => Ok((Value::Unit(), env)),
+        Expr::Bool(value) => Ok((Value::Bool(value), env)),
+        Expr::Int32(value) => Ok((Value::Int32(value), env)),
+        Expr::Float32(value) => Ok((Value::Float32(value), env)),
+        Expr::String(value) => Ok((Value::String(value), env)),
 
         Expr::Identifier(ident) => {
             let value = env
-                .get(ident)
-                .ok_or_else(|| EvalError::UnboundIdentifier(ident.clone()))?;
+                .get(&ident)
+                .ok_or_else(|| EvalError::UnboundIdentifier(ident))?;
 
             Ok((value.clone(), env))
         }
 
         Expr::Lambda { params, body } => {
             let function = Value::Function {
-                params: params.clone(),
-                body: body.clone(),
+                params,
+                body,
                 scope: env.clone(),
             };
 
@@ -29,13 +33,13 @@ pub fn eval(expr: &Expr, env: Environment) -> EvalResult {
         }
 
         Expr::ConstantDefinition { name, value } => {
-            let (value, env) = value.eval(env)?;
-            Ok((Value::Unit(), env.set(name.clone(), value)))
+            let (value, env) = eval(*value, env)?;
+            Ok((Value::Unit(), env.set(name, value)))
         }
 
         Expr::FunctionApplication(lhs, rhs) => {
-            let (lhs, env) = lhs.eval(env)?;
-            let (rhs, env) = rhs.eval(env)?;
+            let (lhs, env) = eval(*lhs, env)?;
+            let (rhs, env) = eval(*rhs, env)?;
 
             match lhs {
                 Value::BuiltInFunction {
@@ -70,7 +74,7 @@ pub fn eval(expr: &Expr, env: Environment) -> EvalResult {
                     let scope = scope.clone().set(param.clone(), rhs);
 
                     if rest.is_empty() {
-                        let (result, _) = body.eval(scope)?;
+                        let (result, _) = eval(*body, scope)?;
                         return Ok((result, env));
                     }
 
@@ -90,12 +94,12 @@ pub fn eval(expr: &Expr, env: Environment) -> EvalResult {
 
         Expr::FunctionDefinition { name, params, body } => {
             let function = Value::Function {
-                params: params.clone(),
-                body: body.clone(),
+                params,
+                body,
                 scope: env.clone(),
             };
 
-            Ok((Value::Unit(), env.set(name.clone(), function)))
+            Ok((Value::Unit(), env.set(name, function)))
         }
 
         Expr::If {
@@ -103,15 +107,12 @@ pub fn eval(expr: &Expr, env: Environment) -> EvalResult {
             then,
             otherwise,
         } => {
-            let (condition, env) = condition.eval(env)?;
+            let (condition, env) = eval(*condition, env)?;
 
-            match condition {
-                Value::Bool(true) => then.eval(env),
-                Value::Bool(false) => otherwise.eval(env),
-                _ => Err(EvalError::InvalidType {
-                    value: condition.clone(),
-                    expected: Type::Bool,
-                }),
+            if condition.try_into()? {
+                eval(*then, env)
+            } else {
+                eval(*otherwise, env)
             }
         }
     }
@@ -125,7 +126,7 @@ fn eval_abs(env: &Environment) -> Result<Value, EvalError> {
         Value::Float32(x) => Ok(x.abs().into()),
         _ => Err(EvalError::InvalidType {
             value: x.clone(),
-            expected: Type::Int32,
+            expected: "Int32 or Float32",
         }),
     };
 }
@@ -145,15 +146,15 @@ fn eval_math(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalError> 
         (BuiltInFunc::Div, Value::Float32(x), Value::Float32(y)) => Ok((x / y).into()),
         (_, Value::Int32(_), y) => Err(EvalError::InvalidType {
             value: y.clone(),
-            expected: Type::Int32,
+            expected: "Int32",
         }),
         (_, Value::Float32(_), y) => Err(EvalError::InvalidType {
             value: y.clone(),
-            expected: Type::Float32,
+            expected: "Float32",
         }),
         (_, x, _) => Err(EvalError::InvalidType {
             value: x.clone(),
-            expected: Type::Int32,
+            expected: "Int32 or Float32",
         }),
     }
 }
@@ -176,30 +177,24 @@ fn eval_comparison(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalE
         (BuiltInFunc::Lte, Value::Float32(x), Value::Float32(y)) => Ok((x <= y).into()),
         (_, Value::Int32(_), y) => Err(EvalError::InvalidType {
             value: y.clone(),
-            expected: Type::Int32,
+            expected: "Int32",
         }),
         (_, Value::Float32(_), y) => Err(EvalError::InvalidType {
             value: y.clone(),
-            expected: Type::Float32,
+            expected: "Float32",
         }),
         (_, x, _) => Err(EvalError::InvalidType {
             value: x.clone(),
-            expected: Type::Int32,
+            expected: "Int32 or Float32",
         }),
     }
 }
 
 fn eval_concat(env: &Environment) -> Result<Value, EvalError> {
-    let x = env.get(&"lhs".into()).unwrap();
-    let y = env.get(&"rhs".into()).unwrap();
+    let x: String = env.get(&"lhs".into()).unwrap().clone().try_into()?;
+    let y: String = env.get(&"rhs".into()).unwrap().clone().try_into()?;
 
-    match (x, y) {
-        (Value::String(x), Value::String(y)) => Ok((format!("{x}{y}")).into()),
-        (x, _) => Err(EvalError::InvalidType {
-            value: x.clone(),
-            expected: Type::String,
-        }),
-    }
+    Ok((format!("{x}{y}")).into())
 }
 
 fn eval_builtin_function(name: &BuiltInFunc, env: &Environment) -> Result<Value, EvalError> {
@@ -214,11 +209,5 @@ fn eval_builtin_function(name: &BuiltInFunc, env: &Environment) -> Result<Value,
         BuiltInFunc::Add | BuiltInFunc::Sub | BuiltInFunc::Mul | BuiltInFunc::Div => {
             eval_math(name, env)
         }
-    }
-}
-
-impl Expr {
-    pub fn eval(&self, env: Environment) -> EvalResult {
-        eval(self, env)
     }
 }

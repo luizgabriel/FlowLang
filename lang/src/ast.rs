@@ -1,18 +1,5 @@
 use crate::{env::Environment, error::EvalError};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LiteralValue {}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Type {
-    Unit,
-    Int32,
-    Float32,
-    Bool,
-    String,
-    Function,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Ident(pub(crate) String);
 
@@ -80,31 +67,13 @@ impl Value {
     }
 }
 
-impl Into<Type> for Value {
-    fn into(self) -> Type {
-        match self {
-            Value::Unit() => Type::Unit,
-            Value::Bool(_) => Type::Bool,
-            Value::Int32(_) => Type::Int32,
-            Value::Float32(_) => Type::Float32,
-            Value::String(_) => Type::String,
-            Value::BuiltInFunction {
-                name: _,
-                params: _,
-                scope: _,
-            } => Type::Function,
-            Value::Function {
-                params: _,
-                body: _,
-                scope: _,
-            } => Type::Function,
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Literal(Value),
+    Unit,
+    Bool(bool),
+    Int32(i32),
+    Float32(f32),
+    String(String),
     Identifier(Ident),
     ConstantDefinition {
         name: Ident,
@@ -128,17 +97,6 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn unit() -> Expr {
-        Expr::Literal(Value::Unit())
-    }
-
-    pub fn literal<T>(value: T) -> Expr
-    where
-        T: Into<Value>,
-    {
-        Expr::Literal(value.into())
-    }
-
     pub fn ident(name: &str) -> Expr {
         Expr::Identifier(Ident::new(name))
     }
@@ -188,7 +146,7 @@ macro_rules! define_value_conversion {
                     Value::$type(value) => Ok(value),
                     _ => Err(EvalError::InvalidType {
                         value,
-                        expected: Type::$type,
+                        expected: stringify!($type),
                     }),
                 }
             }

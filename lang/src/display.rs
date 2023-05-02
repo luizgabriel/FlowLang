@@ -1,6 +1,6 @@
 use std::fmt::{Display, Error, Formatter};
 
-use crate::ast::{Expr, Ident, Type, Value};
+use crate::ast::{Expr, Ident, Value};
 
 impl Display for Ident {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
@@ -53,7 +53,11 @@ impl Display for Value {
 impl Display for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expr::Literal(value) => write!(f, "{}", value),
+            Expr::Unit => write!(f, "()"),
+            Expr::Bool(value) => write!(f, "{}", value),
+            Expr::Int32(value) => write!(f, "{}", value),
+            Expr::Float32(value) => write!(f, "{}", value),
+            Expr::String(value) => write!(f, "\"{}\"", value),
             Expr::Identifier(ident) => write!(f, "{}", ident),
             Expr::ConstantDefinition { name, value } => write!(f, "{} = {}", name, value),
             Expr::FunctionApplication(lhs, rhs) => match (*lhs.clone(), *rhs.clone()) {
@@ -88,19 +92,6 @@ impl Display for Expr {
                 then,
                 otherwise,
             } => write!(f, "if ({}) then ({}) else ({})", condition, then, otherwise),
-        }
-    }
-}
-
-impl Display for Type {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Type::Unit => write!(f, "()"),
-            Type::Bool => write!(f, "Bool"),
-            Type::Int32 => write!(f, "Int32"),
-            Type::Float32 => write!(f, "Float32"),
-            Type::Function => write!(f, "Function"),
-            Type::String => write!(f, "String"),
         }
     }
 }

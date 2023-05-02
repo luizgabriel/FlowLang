@@ -99,32 +99,18 @@ where
     )(input)
 }
 
-fn fw_number<'a, E>(input: &'a str) -> IResult<&'a str, Value, E>
+fn fw_literal<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
     E: ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseIntError>
         + FromExternalError<&'a str, ParseFloatError>,
 {
-    context(
-        "number",
-        alt((
-            map(fw_float, Value::Float32), //
-            map(fw_nat, Value::Int32),
-        )),
-    )(input)
-}
-
-fn fw_literal<'a, E>(input: &'a str) -> IResult<&'a str, Value, E>
-where
-    E: ParseError<&'a str>
-        + ContextError<&'a str>
-        + FromExternalError<&'a str, ParseIntError>
-        + FromExternalError<&'a str, ParseFloatError>,
-{
-    let parse_unit = value(Value::Unit(), tag("()"));
-    let parse_true = value(Value::Bool(true), tag("true"));
-    let parse_false = value(Value::Bool(false), tag("false"));
+    let parse_unit = value(Expr::Unit, tag("()"));
+    let parse_true = value(Expr::Bool(true), tag("true"));
+    let parse_false = value(Expr::Bool(false), tag("false"));
+    let parse_float = map(fw_float, Expr::Float32);
+    let parse_nat = map(fw_nat, Expr::Int32);
 
     context(
         "literal",
@@ -132,8 +118,9 @@ where
             parse_unit,
             parse_true,
             parse_false,
-            fw_number,
-            map(parse_string, Value::String),
+            parse_float,
+            parse_nat,
+            map(parse_string, Expr::String),
         )),
     )(input)
 }
@@ -147,7 +134,7 @@ where
         + FromExternalError<&'a str, ParseFloatError>,
 {
     alt((
-        map(ws0(fw_literal), Expr::Literal),
+        ws0(fw_literal),
         map(ws0(fw_identifier), Expr::Identifier),
         map(ws0(paren(fw_operator)), Expr::Identifier),
     ))(input)

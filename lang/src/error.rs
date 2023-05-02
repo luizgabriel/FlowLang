@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::ast::{Expr, Ident, Type, Value};
+use crate::ast::{Expr, Ident, Value};
 
 #[derive(Error, Debug)]
 pub enum ParseError<'a> {
@@ -26,7 +26,10 @@ pub enum EvalError {
     NotAFunction(Value),
 
     #[error("Invalid type: expected {expected} got {value}")]
-    InvalidType { value: Value, expected: Type },
+    InvalidType {
+        value: Value,
+        expected: &'static str,
+    },
 
     #[error("Division by zero")]
     DivideByZero,
