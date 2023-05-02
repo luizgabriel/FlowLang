@@ -4,9 +4,7 @@ use crate::{
     error::EvalError,
 };
 
-type EvalResult = Result<(Value, Environment), EvalError>;
-
-pub fn eval(expr: Expr, env: Environment) -> EvalResult {
+pub fn eval(expr: Expr, env: Environment) -> Result<(Value, Environment), EvalError> {
     match expr {
         Expr::Unit => Ok((Value::Unit(), env)),
         Expr::Bool(value) => Ok((Value::Bool(value), env)),

@@ -16,58 +16,6 @@ impl From<&str> for Ident {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum BuiltInFunc {
-    Eq,
-    Gt,
-    Lt,
-    Gte,
-    Lte,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Abs,
-    Concat,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Value {
-    Unit(),
-    Bool(bool),
-    Int32(i32),
-    Float32(f32),
-    String(String),
-    Function {
-        params: Vec<Ident>,
-        body: Box<Expr>,
-        scope: Environment,
-    },
-    BuiltInFunction {
-        name: BuiltInFunc,
-        params: Vec<Ident>,
-        scope: Environment,
-    },
-}
-
-impl Value {
-    pub fn builtin_1(name: BuiltInFunc) -> Value {
-        Value::BuiltInFunction {
-            name,
-            params: vec![Ident::new("x")],
-            scope: Environment::new(),
-        }
-    }
-
-    pub fn builtin_2(name: BuiltInFunc) -> Value {
-        Value::BuiltInFunction {
-            name,
-            params: vec![Ident::new("lhs"), Ident::new("rhs")],
-            scope: Environment::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Unit,
     Bool(bool),
@@ -132,6 +80,58 @@ impl Expr {
             condition: Box::new(condition),
             then: Box::new(then),
             otherwise: Box::new(otherwise),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BuiltInFunc {
+    Eq,
+    Gt,
+    Lt,
+    Gte,
+    Lte,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Abs,
+    Concat,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Value {
+    Unit(),
+    Bool(bool),
+    Int32(i32),
+    Float32(f32),
+    String(String),
+    Function {
+        params: Vec<Ident>,
+        body: Box<Expr>,
+        scope: Environment,
+    },
+    BuiltInFunction {
+        name: BuiltInFunc,
+        params: Vec<Ident>,
+        scope: Environment,
+    },
+}
+
+impl Value {
+    pub fn builtin_1(name: BuiltInFunc) -> Value {
+        Value::BuiltInFunction {
+            name,
+            params: vec![Ident::new("x")],
+            scope: Environment::new(),
+        }
+    }
+
+    pub fn builtin_2(name: BuiltInFunc) -> Value {
+        Value::BuiltInFunction {
+            name,
+            params: vec![Ident::new("lhs"), Ident::new("rhs")],
+            scope: Environment::new(),
         }
     }
 }
