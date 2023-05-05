@@ -3,7 +3,8 @@ use thiserror::Error;
 
 use crate::{
     builtin::BuiltInFunc,
-    parsing::{parse, Expr, Ident},
+    params,
+    parsing::{parse, Expr, Ident, ParamsList},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -14,13 +15,13 @@ pub enum Value {
     Float32(f32),
     String(String),
     Function {
-        params: Vec<Ident>,
+        params: ParamsList,
         body: Box<Expr>,
         scope: ValueEnvironment,
     },
     BuiltInFunction {
         name: BuiltInFunc,
-        params: Vec<Ident>,
+        params: ParamsList,
         scope: ValueEnvironment,
     },
 }
@@ -29,7 +30,7 @@ impl Value {
     pub fn builtin_1(name: BuiltInFunc) -> Value {
         Value::BuiltInFunction {
             name,
-            params: vec![Ident::new("x")],
+            params: params!(x),
             scope: ValueEnvironment::new(),
         }
     }
@@ -37,7 +38,7 @@ impl Value {
     pub fn builtin_2(name: BuiltInFunc) -> Value {
         Value::BuiltInFunction {
             name,
-            params: vec![Ident::new("lhs"), Ident::new("rhs")],
+            params: params!(lhs, rhs),
             scope: ValueEnvironment::new(),
         }
     }
@@ -149,7 +150,7 @@ impl ValueEnvironment {
             .set(Ident::new("++"), Value::builtin_2(BuiltInFunc::Concat))
             .set(Ident::new("abs"), Value::builtin_1(BuiltInFunc::Abs))
             .set(Ident::new("sqrt"), Value::builtin_1(BuiltInFunc::Sqrt))
-            .set(Ident::new("pow"), Value::builtin_1(BuiltInFunc::Pow))
+            .set(Ident::new("pow"), Value::builtin_2(BuiltInFunc::Pow))
             .force_eval(parse("equalUpTo epsilon x y = abs (x - y) < epsilon").unwrap())
             .force_eval(parse("(|>) a f = f a").unwrap())
             .force_eval(parse("(>>) f g = x -> g (f x)").unwrap())
@@ -303,31 +304,13 @@ impl std::fmt::Display for Value {
                 params,
                 body,
                 scope: _,
-            } => write!(
-                f,
-                "({} -> {})",
-                params
-                    .iter()
-                    .map(|p| p.to_string())
-                    .collect::<Vec<String>>()
-                    .join(" "),
-                body,
-            ),
+            } => write!(f, "({} -> {})", params, body,),
             Value::BuiltInFunction {
                 name,
                 params,
                 scope: _,
             } => {
-                write!(
-                    f,
-                    "({} -> {})",
-                    params
-                        .iter()
-                        .map(|p| p.to_string())
-                        .collect::<Vec<String>>()
-                        .join(" "),
-                    name,
-                )
+                write!(f, "({} -> {})", params, name,)
             }
         }
     }
@@ -348,17 +331,7 @@ impl std::fmt::Display for Expr {
                 (_, _) => write!(f, "{} {}", lhs, rhs),
             },
             Expr::FunctionDefinition { name, params, body } => {
-                write!(
-                    f,
-                    "{} {} = {}",
-                    name,
-                    params
-                        .iter()
-                        .map(|p| p.to_string())
-                        .collect::<Vec<String>>()
-                        .join(" "),
-                    body
-                )
+                write!(f, "{} {} = {}", name, params, body)
             }
             Expr::Lambda { params, body } => write!(
                 f,

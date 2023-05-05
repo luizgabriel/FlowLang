@@ -123,11 +123,12 @@ fn eval_sqrt(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalEr
 }
 
 fn eval_pow(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
-    let x = env.get(&"x".into()).unwrap();
-    let y = env.get(&"y".into()).unwrap();
+    let x = env.get(&"lhs".into()).unwrap();
+    let y = env.get(&"rhs".into()).unwrap();
 
     match (x, y) {
         (Value::Int32(x), Value::Int32(y)) => env.pure((x.pow(*y as u32)).into()),
+        (Value::Int32(x), Value::Float32(y)) => env.pure((*x as f32).powf(*y).into()),
         (Value::Float32(x), Value::Float32(y)) => env.pure(x.powf(*y).into()),
         (Value::Int32(_), y) => Err(EvalError::InvalidType {
             value: y.clone(),
