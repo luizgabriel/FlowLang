@@ -24,16 +24,74 @@ impl Ident {
     pub fn new(name: &str) -> Self {
         Ident(name.to_string())
     }
-
-    pub fn from_vec(names: Vec<&str>) -> Vec<Self> {
-        names.into_iter().map(Ident::new).collect()
-    }
 }
 
 impl From<&str> for Ident {
     fn from(name: &str) -> Self {
         Ident::new(name)
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParamsList {
+    params: Vec<Ident>,
+}
+
+impl ParamsList {
+    pub fn new(params: Vec<Ident>) -> Self {
+        ParamsList { params }
+    }
+
+    pub fn len(&self) -> usize {
+        self.params.len()
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Ident> {
+        self.params.get(index)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Ident> {
+        self.params.iter()
+    }
+
+    pub fn split_first(&self) -> Option<(&Ident, &[Ident])> {
+        self.params.split_first()
+    }
+}
+
+impl IntoIterator for ParamsList {
+    type Item = Ident;
+    type IntoIter = <Vec<Ident> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.params.into_iter()
+    }
+}
+
+impl FromIterator<Ident> for ParamsList {
+    fn from_iter<T: IntoIterator<Item = Ident>>(iter: T) -> Self {
+        ParamsList::new(iter.into_iter().collect())
+    }
+}
+
+impl std::fmt::Display for ParamsList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(
+            f,
+            "{}",
+            self.iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<String>>()
+                .join(" ")
+        )
+    }
+}
+
+#[macro_export]
+macro_rules! params {
+    ($($param:ident),+) => {
+        ParamsList::new(vec![$(Ident::new(stringify!($param))),*])
+    };
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,11 +109,11 @@ pub enum Expr {
     FunctionApplication(Box<Expr>, Box<Expr>),
     FunctionDefinition {
         name: Ident,
-        params: Vec<Ident>,
+        params: ParamsList,
         body: Box<Expr>,
     },
     Lambda {
-        params: Vec<Ident>,
+        params: ParamsList,
         body: Box<Expr>,
     },
     If {
@@ -77,7 +135,7 @@ impl Expr {
         }
     }
 
-    pub fn fndef(name: Ident, params: Vec<Ident>, body: Expr) -> Expr {
+    pub fn fndef(name: Ident, params: ParamsList, body: Expr) -> Expr {
         Expr::FunctionDefinition {
             name,
             params,
@@ -89,7 +147,7 @@ impl Expr {
         Expr::FunctionApplication(Box::new(func), Box::new(arg))
     }
 
-    pub fn lambda(params: Vec<Ident>, body: Expr) -> Expr {
+    pub fn lambda(params: ParamsList, body: Expr) -> Expr {
         Expr::Lambda {
             params,
             body: Box::new(body),
@@ -302,6 +360,16 @@ where
     alt((infix_op_fn_app, fw_expr13))(input)
 }
 
+fn fw_param_list<'a, E>(input: &'a str) -> IResult<&'a str, ParamsList, E>
+where
+    E: nom::error::ParseError<&'a str> + ContextError<&'a str>,
+{
+    context(
+        "parameter list",
+        map(many1(ws0(fw_identifier)), ParamsList::new),
+    )(input)
+}
+
 // (Lambda Expressions)
 // Expr11 = (arg1 arg2 ... argN -> Expr12)
 fn fw_expr11<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
@@ -314,7 +382,7 @@ where
     let lambda = context(
         "lambda expression",
         map(
-            tuple((many1(ws0(fw_identifier)), ws0(tag("->")), fw_expr12)),
+            tuple((fw_param_list, ws0(tag("->")), fw_expr12)),
             |(args, _, body)| Expr::lambda(args, body),
         ),
     );
@@ -364,7 +432,7 @@ where
         map(
             tuple((
                 ws0(alt((fw_identifier, paren(ws0(fw_operator))))),
-                many1(ws0(fw_identifier)),
+                fw_param_list,
                 ws0(tag("=")),
                 fw_expr10,
             )),
