@@ -12,26 +12,14 @@ pub enum BuiltInFunc {
     Mul,
     Div,
     Abs,
+    Sqrt,
     Concat,
+    Pow,
 }
 
 impl std::fmt::Display for BuiltInFunc {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let name = match self {
-            BuiltInFunc::Eq => "eq",
-            BuiltInFunc::Gt => "gt",
-            BuiltInFunc::Lt => "lt",
-            BuiltInFunc::Gte => "gte",
-            BuiltInFunc::Lte => "lte",
-            BuiltInFunc::Add => "add",
-            BuiltInFunc::Sub => "sub",
-            BuiltInFunc::Mul => "mul",
-            BuiltInFunc::Div => "div",
-            BuiltInFunc::Abs => "abs",
-            BuiltInFunc::Concat => "concat",
-        };
-
-        write!(f, "<builtin-{}>", name)
+        write!(f, "<builtin-{:?}>", self)
     }
 }
 
@@ -121,6 +109,41 @@ fn eval_abs(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalErr
     }
 }
 
+fn eval_sqrt(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
+    let x = env.get(&"x".into()).unwrap();
+
+    match x {
+        Value::Int32(x) => env.pure((*x as f32).sqrt().into()),
+        Value::Float32(x) => env.pure(x.sqrt().into()),
+        x => Err(EvalError::InvalidType {
+            value: x.clone(),
+            expected: "Int32 or Float32",
+        }),
+    }
+}
+
+fn eval_pow(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
+    let x = env.get(&"x".into()).unwrap();
+    let y = env.get(&"y".into()).unwrap();
+
+    match (x, y) {
+        (Value::Int32(x), Value::Int32(y)) => env.pure((x.pow(*y as u32)).into()),
+        (Value::Float32(x), Value::Float32(y)) => env.pure(x.powf(*y).into()),
+        (Value::Int32(_), y) => Err(EvalError::InvalidType {
+            value: y.clone(),
+            expected: "Int32",
+        }),
+        (Value::Float32(_), y) => Err(EvalError::InvalidType {
+            value: y.clone(),
+            expected: "Float32",
+        }),
+        (x, _) => Err(EvalError::InvalidType {
+            value: x.clone(),
+            expected: "Int32 or Float32",
+        }),
+    }
+}
+
 impl Evaluator for BuiltInFunc {
     type Context = ValueEnvironment;
     type Error = EvalError;
@@ -129,6 +152,8 @@ impl Evaluator for BuiltInFunc {
     fn eval(&self, env: ValueEnvironment) -> Result<(Self::Output, Self::Context), Self::Error> {
         match self {
             BuiltInFunc::Concat => eval_concat(&env),
+            BuiltInFunc::Sqrt => eval_sqrt(&env),
+            BuiltInFunc::Pow => eval_pow(&env),
             BuiltInFunc::Eq
             | BuiltInFunc::Gt
             | BuiltInFunc::Lt

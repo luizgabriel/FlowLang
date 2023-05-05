@@ -10,7 +10,7 @@
 
 ```hs
 square x = x * x
-hypotenuse x y = square x + square y
+hypotenuse x y = sqrt (square x + square y)
 
 hypotenuse 3 4
 ```

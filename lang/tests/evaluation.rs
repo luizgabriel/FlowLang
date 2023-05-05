@@ -39,8 +39,7 @@ fn test_bultins() {
         "10 + 50" => Value::Int32(60),
         "10 - 50" => Value::Int32(-40),
         "10 / 2" => Value::Int32(5),
-        "e = 0.0001" => Value::Unit(),
-        "compare x y = abs (x - y) < e" => Value::Unit(),
+        "compare = equalUpTo 0.0001" => Value::Unit(),
         "compare (5.0 / 2.0) 2.5" => Value::Bool(true),
         "compare (1.1 + 2.2 - 5.0) -1.7" => Value::Bool(true)
     }
@@ -58,8 +57,8 @@ fn test_lambda() {
 fn test_function_declaration() {
     assert_evals! {
         "square x = x * x" => Value::Unit(),
-        "hypotenuse x y = square x + square y" => Value::Unit(),
-        "hypotenuse 3 4" => Value::Int32(25)
+        "hypotenuse x y = sqrt (square x + square y)" => Value::Unit(),
+        "hypotenuse 3 4" => Value::Float32(5.0)
     }
 }
 
