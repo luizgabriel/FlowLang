@@ -3,10 +3,8 @@ mod error;
 use colored::Colorize;
 use error::REPLError;
 use lang::{
-    env::Environment,
-    error::{EvalError, ParseError},
-    evaluation::eval,
-    parsing::parse,
+    evaluation::{EvalError, Evaluator, ValueEnvironment},
+    parsing::{parse, ParseError},
 };
 use rustyline::{error::ReadlineError, Editor};
 
@@ -27,13 +25,13 @@ fn main() {
 
     rl.load_history(HISTORY_PATH).unwrap_or_default();
 
-    let mut env = Environment::new_with_std();
+    let mut env = ValueEnvironment::new_with_std();
 
     loop {
         let result = read(&mut rl)
             .map_err(ReadlineError::into)
             .and_then(|input| parse(&input).map_err(ParseError::into))
-            .and_then(|expr| eval(expr, env.clone()).map_err(EvalError::into));
+            .and_then(|expr| expr.eval(env.clone()).map_err(EvalError::into));
 
         match result {
             Ok((value, next_env)) => {

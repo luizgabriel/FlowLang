@@ -1,15 +1,25 @@
-use lang::ast::Value;
-
 macro_rules! assert_evals {
     ($($input:expr => $expected:expr),*) => {
-        let pairs: Vec<(&'static str, lang::ast::Value)> = vec![$(($input, $expected)),*];
+        use lang::parsing::parse;
+        use lang::evaluation::ValueEnvironment;
+        use lang::evaluation::Value;
+        use lang::evaluation::Evaluator;
+
+        let pairs: Vec<(&'static str, Value)> = vec![$(($input, $expected)),*];
         pairs
             .iter()
-            .map(|(input, expected)| (lang::parsing::parse(input).unwrap(), expected))
-            .fold(lang::env::Environment::new_with_std(), |acc, (expr, expected)| -> lang::env::Environment {
-                let (value, next_env) = lang::evaluation::eval(expr, acc).unwrap();
-                assert_eq!(&value, expected);
-                next_env
+            .map(|(input, expected)| (parse(input).unwrap(), expected))
+            .fold((ValueEnvironment::new_with_std(), 1), |(acc, line), (expr, expected)| -> (ValueEnvironment, usize) {
+                match expr.eval(acc) {
+                    Ok((result, env)) => {
+                        assert_eq!(&result, expected, "Asserting {}: Expected {} at line {}", result, expected, line);
+                        (env, line + 1)
+                    },
+
+                    Err(err) => {
+                        panic!("Error: {} at line {}", err, line)
+                    },
+                }
             });
     };
 }

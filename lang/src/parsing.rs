@@ -8,18 +8,122 @@ use nom::{
     bytes::complete::tag,
     character::complete::{alpha1, alphanumeric1, digit1, multispace0, one_of},
     combinator::{map, map_res, opt, recognize, value, verify},
-    error::{context, ContextError, FromExternalError, ParseError},
+    error::{context, ContextError, FromExternalError},
     multi::{many0_count, many1},
     sequence::{delimited, pair, separated_pair, tuple},
     IResult, Parser,
 };
+use thiserror::Error;
 
-use crate::{ast::*, error, string::parse_string};
+use crate::string::parse_string;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Ident(pub(crate) String);
+
+impl Ident {
+    pub fn new(name: &str) -> Self {
+        Ident(name.to_string())
+    }
+
+    pub fn from_vec(names: Vec<&str>) -> Vec<Self> {
+        names.into_iter().map(Ident::new).collect()
+    }
+}
+
+impl From<&str> for Ident {
+    fn from(name: &str) -> Self {
+        Ident::new(name)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Expr {
+    Unit,
+    Bool(bool),
+    Int32(i32),
+    Float32(f32),
+    String(String),
+    Identifier(Ident),
+    ConstantDefinition {
+        name: Ident,
+        expr: Box<Expr>,
+    },
+    FunctionApplication(Box<Expr>, Box<Expr>),
+    FunctionDefinition {
+        name: Ident,
+        params: Vec<Ident>,
+        body: Box<Expr>,
+    },
+    Lambda {
+        params: Vec<Ident>,
+        body: Box<Expr>,
+    },
+    If {
+        condition: Box<Expr>,
+        then: Box<Expr>,
+        otherwise: Box<Expr>,
+    },
+}
+
+impl Expr {
+    pub fn ident(name: &str) -> Expr {
+        Expr::Identifier(Ident::new(name))
+    }
+
+    pub fn constdef(name: Ident, value: Expr) -> Expr {
+        Expr::ConstantDefinition {
+            name,
+            expr: Box::new(value),
+        }
+    }
+
+    pub fn fndef(name: Ident, params: Vec<Ident>, body: Expr) -> Expr {
+        Expr::FunctionDefinition {
+            name,
+            params,
+            body: Box::new(body),
+        }
+    }
+
+    pub fn fnapp(func: Expr, arg: Expr) -> Expr {
+        Expr::FunctionApplication(Box::new(func), Box::new(arg))
+    }
+
+    pub fn lambda(params: Vec<Ident>, body: Expr) -> Expr {
+        Expr::Lambda {
+            params,
+            body: Box::new(body),
+        }
+    }
+
+    pub fn ife(condition: Expr, then: Expr, otherwise: Expr) -> Expr {
+        Expr::If {
+            condition: Box::new(condition),
+            then: Box::new(then),
+            otherwise: Box::new(otherwise),
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum ParseError<'a> {
+    #[error("Expression not fully parsed: {0}, Remaining: \"{1}\"")]
+    ExpressionNotFullyParsed(Expr, &'a str),
+
+    #[error("Invalid expression: {}", nom::error::convert_error(*.0, .1.clone()))]
+    InvalidExpression(&'a str, nom::error::VerboseError<&'a str>),
+
+    #[error("Incomplete input: {0}\n{carret:>column$}", carret = "^", column = .1)]
+    IncompleteInput(&'a str, usize),
+
+    #[error("Failed to parse expression: {}", nom::error::convert_error(*.0, .1.clone()))]
+    Failure(&'a str, nom::error::VerboseError<&'a str>),
+}
 
 fn ws0<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
     F: Parser<&'a str, O, E>,
-    E: ParseError<&'a str>,
+    E: nom::error::ParseError<&'a str>,
 {
     delimited(multispace0, inner, multispace0)
 }
@@ -27,7 +131,7 @@ where
 fn paren<'a, O, E, F>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
     F: Parser<&'a str, O, E>,
-    E: ParseError<&'a str>,
+    E: nom::error::ParseError<&'a str>,
 {
     delimited(tag("("), inner, tag(")"))
 }
@@ -39,7 +143,7 @@ fn blacklist<'o, I, O, E, F>(
 where
     I: Clone + 'o,
     F: Parser<I, O, E> + 'o,
-    E: ParseError<I> + 'o,
+    E: nom::error::ParseError<I> + 'o,
     O: std::cmp::PartialEq,
 {
     verify(parser, |result| !blacklist.contains(result))
@@ -47,7 +151,7 @@ where
 
 fn fw_identifier<'a, E>(input: &'a str) -> IResult<&'a str, Ident, E>
 where
-    E: ParseError<&'a str> + ContextError<&'a str>,
+    E: nom::error::ParseError<&'a str> + ContextError<&'a str>,
 {
     let identifier = recognize(pair(
         alt((alpha1, tag("_"))),
@@ -63,7 +167,7 @@ where
 
 fn fw_operator<'a, E>(input: &'a str) -> IResult<&'a str, Ident, E>
 where
-    E: ParseError<&'a str> + ContextError<&'a str>,
+    E: nom::error::ParseError<&'a str> + ContextError<&'a str>,
 {
     context(
         "operator",
@@ -74,7 +178,9 @@ where
 fn fw_nat<'a, T, E>(input: &'a str) -> IResult<&'a str, T, E>
 where
     T: FromStr<Err = ParseIntError>,
-    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+    E: nom::error::ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseIntError>,
 {
     context(
         "nat",
@@ -85,7 +191,9 @@ where
 fn fw_float<'a, T, E>(input: &'a str) -> IResult<&'a str, T, E>
 where
     T: FromStr<Err = ParseFloatError>,
-    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, ParseFloatError>,
+    E: nom::error::ParseError<&'a str>
+        + ContextError<&'a str>
+        + FromExternalError<&'a str, ParseFloatError>,
 {
     context(
         "float",
@@ -101,7 +209,7 @@ where
 
 fn fw_literal<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str>
+    E: nom::error::ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseIntError>
         + FromExternalError<&'a str, ParseFloatError>,
@@ -128,7 +236,7 @@ where
 // Expr15 = literal | identifier | (operator)
 fn fw_expr15<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str>
+    E: nom::error::ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseIntError>
         + FromExternalError<&'a str, ParseFloatError>,
@@ -143,7 +251,7 @@ where
 // Expr14 = "(" Expr ")" | Expr15
 fn fw_expr14<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str>
+    E: nom::error::ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseIntError>
         + FromExternalError<&'a str, ParseFloatError>,
@@ -155,7 +263,7 @@ where
 // Expr13 = Expr14 Expr14 Expr14 ...
 fn fw_expr13<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str>
+    E: nom::error::ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseIntError>
         + FromExternalError<&'a str, ParseFloatError>,
@@ -174,7 +282,7 @@ where
 // Expr12 = Expr13 [ "Operator" Expr13 ]*
 fn fw_expr12<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str>
+    E: nom::error::ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseIntError>
         + FromExternalError<&'a str, ParseFloatError>,
@@ -198,7 +306,7 @@ where
 // Expr11 = (arg1 arg2 ... argN -> Expr12)
 fn fw_expr11<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str>
+    E: nom::error::ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseIntError>
         + FromExternalError<&'a str, ParseFloatError>,
@@ -218,7 +326,7 @@ where
 // Expr10 = if Expr11 then Expr11 else Expr11
 fn fw_expr10<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str>
+    E: nom::error::ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseIntError>
         + FromExternalError<&'a str, ParseFloatError>,
@@ -246,7 +354,7 @@ where
 // Expr9 = (operator) arg1 arg2 ... argnN = Expr10
 fn fw_expr9<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str>
+    E: nom::error::ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseIntError>
         + FromExternalError<&'a str, ParseFloatError>,
@@ -271,7 +379,7 @@ where
 // ident = Expr9
 fn fw_expr8<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str>
+    E: nom::error::ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseIntError>
         + FromExternalError<&'a str, ParseFloatError>,
@@ -290,7 +398,7 @@ where
 // Expr0 = Expr8
 fn fw_expr<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: ParseError<&'a str>
+    E: nom::error::ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseIntError>
         + FromExternalError<&'a str, ParseFloatError>,
@@ -300,32 +408,36 @@ where
 
 fn map_nom_error<'a>(
     input: &'a str,
-) -> impl FnMut(nom::Err<nom::error::VerboseError<&'a str>>) -> error::ParseError<'a> {
+) -> impl FnMut(nom::Err<nom::error::VerboseError<&'a str>>) -> ParseError<'a> {
     move |err| match err {
-        nom::Err::Incomplete(needed) => error::ParseError::IncompleteInput(
+        nom::Err::Incomplete(needed) => ParseError::IncompleteInput(
             input,
             match needed {
                 nom::Needed::Unknown => 0,
                 nom::Needed::Size(n) => n.get(),
             },
         ),
-        nom::Err::Error(e) => error::ParseError::InvalidExpression(input, e),
-        nom::Err::Failure(e) => error::ParseError::Failure(input, e),
+        nom::Err::Error(e) => ParseError::InvalidExpression(input, e),
+        nom::Err::Failure(e) => ParseError::Failure(input, e),
     }
 }
 
-fn assert_parsed_full<'a>(
-    (remainder, expr): (&'a str, Expr),
-) -> Result<Expr, error::ParseError<'a>> {
+fn assert_parsed_full<'a>((remainder, expr): (&'a str, Expr)) -> Result<Expr, ParseError<'a>> {
     if str::is_empty(remainder) {
         Ok(expr)
     } else {
-        Err(error::ParseError::ExpressionNotFullyParsed(expr, remainder))
+        Err(ParseError::ExpressionNotFullyParsed(expr, remainder))
     }
 }
 
-pub fn parse(input: &str) -> Result<Expr, error::ParseError> {
+pub fn parse(input: &str) -> Result<Expr, ParseError> {
     fw_expr::<nom::error::VerboseError<&str>>(input)
         .map_err(map_nom_error(input))
         .and_then(assert_parsed_full)
+}
+
+impl std::fmt::Display for Ident {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self.0)
+    }
 }
