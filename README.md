@@ -1,4 +1,5 @@
 # FlowLang
+
 [![Rust](https://github.com/luizgabriel/FlowLang/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/luizgabriel/FlowLang/actions/workflows/rust.yml)
 
 [WIP] A statically typed, functional programming language.
@@ -21,13 +22,15 @@ hypotenuse 3 4
 3 + (5 ** 6) / 2
 ```
 
-### Piping Operator
+### Piping & Composing Operators
 
 ```hs
 add5 = (+) 5
 times2 = (*) 2
-
 7 |> times2 |> add5
+
+add5_and_times2 = add5 >> times2
+add5_and_times2 10
 ```
 
 ### If Expressions
