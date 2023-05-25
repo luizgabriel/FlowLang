@@ -1,9 +1,12 @@
-use lang::parsing::Expr;
+use lang::parsing::{
+    ast::{Expr, Module},
+    parse_module,
+};
 
 macro_rules! assert_parse {
     ($input:expr, $expected:expr) => {
-        let expr = lang::parsing::parse($input).unwrap();
-        assert_eq!(expr, $expected);
+        let expr = lang::parsing::parse_expr($input);
+        assert_eq!(expr, Ok($expected));
     };
 }
 
@@ -54,9 +57,22 @@ fn test_function_application() {
 fn test_operator_function_application() {
     assert_parse!(
         "foo + bar",
-        Expr::fnapp(
-            Expr::fnapp(Expr::ident("+"), Expr::ident("foo")),
-            Expr::ident("bar")
+        Expr::opapp(Expr::ident("+"), Expr::ident("foo"), Expr::ident("bar"))
+    );
+    assert_parse!(
+        "(foo |> bar) |> baz",
+        Expr::opapp(
+            Expr::ident("|>"),
+            Expr::opapp(Expr::ident("|>"), Expr::ident("foo"), Expr::ident("bar")),
+            Expr::ident("baz"),
+        )
+    );
+    assert_parse!(
+        "foo |> (bar |> baz)",
+        Expr::opapp(
+            Expr::ident("|>"),
+            Expr::ident("foo"),
+            Expr::opapp(Expr::ident("|>"), Expr::ident("bar"), Expr::ident("baz")),
         )
     );
 }
@@ -74,5 +90,32 @@ fn test_if_expr() {
             Expr::Int32(1),
             Expr::ife(Expr::Bool(false), Expr::Int32(2), Expr::Int32(3))
         )
+    );
+}
+
+macro_rules! asserts_parse_module {
+    ($input:expr, $excepted:expr) => {
+        match parse_module($input) {
+            Ok(expr) => assert_eq!(expr, Module::new($excepted)),
+            Err(err) => panic!("Error: \n{}", err),
+        }
+    };
+}
+
+#[test]
+fn test_module() {
+    asserts_parse_module!(
+        "x = 2\ny = 3\n",
+        vec![
+            Expr::constdef("x".into(), Expr::Int32(2)),
+            Expr::constdef("y".into(), Expr::Int32(3))
+        ]
+    );
+    asserts_parse_module!(
+        "\n\nx = 5\n\n\n\ty = 6\t\n",
+        vec![
+            Expr::constdef("x".into(), Expr::Int32(5)),
+            Expr::constdef("y".into(), Expr::Int32(6))
+        ]
     );
 }

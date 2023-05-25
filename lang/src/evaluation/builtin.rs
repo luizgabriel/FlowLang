@@ -150,7 +150,7 @@ impl Evaluator for BuiltInFunc {
     type Error = EvalError;
     type Output = Value;
 
-    fn eval(&self, env: ValueEnvironment) -> Result<(Self::Output, Self::Context), Self::Error> {
+    fn eval(self, env: ValueEnvironment) -> Result<(Self::Output, Self::Context), Self::Error> {
         match self {
             BuiltInFunc::Concat => eval_concat(&env),
             BuiltInFunc::Sqrt => eval_sqrt(&env),
@@ -159,10 +159,10 @@ impl Evaluator for BuiltInFunc {
             | BuiltInFunc::Gt
             | BuiltInFunc::Lt
             | BuiltInFunc::Gte
-            | BuiltInFunc::Lte => eval_comparison(self, &env),
+            | BuiltInFunc::Lte => eval_comparison(&self, &env),
             BuiltInFunc::Abs => eval_abs(&env),
             BuiltInFunc::Add | BuiltInFunc::Sub | BuiltInFunc::Mul | BuiltInFunc::Div => {
-                eval_math(self, &env)
+                eval_math(&self, &env)
             }
         }
     }

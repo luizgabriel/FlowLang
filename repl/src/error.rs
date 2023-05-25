@@ -1,4 +1,4 @@
-use lang::{evaluation::EvalError, parsing::ParseError};
+use lang::{evaluation::error::EvalError, parsing::error::ParseError};
 use rustyline::error::ReadlineError;
 use thiserror::Error;
 
@@ -10,13 +10,19 @@ pub enum REPLError {
     #[error("Parse error: {0}")]
     ParseError(String),
 
+    #[error("Incomplete input")]
+    IncompleteInput,
+
     #[error("Evaluation error: {0}")]
     EvaluationError(String),
 }
 
-impl<'a> Into<REPLError> for ParseError<'a> {
+impl<'a> Into<REPLError> for ParseError {
     fn into(self) -> REPLError {
-        REPLError::ParseError(self.to_string())
+        match self {
+            ParseError::IncompleteInput => REPLError::IncompleteInput,
+            ParseError::ParseError(e) => REPLError::ParseError(e),
+        }
     }
 }
 
