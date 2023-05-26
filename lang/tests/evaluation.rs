@@ -9,7 +9,7 @@ macro_rules! assert_evals {
         pairs
             .iter()
             .map(|(input, expected)| (parse(input).unwrap(), expected))
-            .fold((ValueEnvironment::new_with_std(), 1), |(acc, line), (expr, expected)| -> (ValueEnvironment, usize) {
+            .fold((ValueEnvironment::new().import_std(), 1), |(acc, line), (expr, expected)| -> (ValueEnvironment, usize) {
                 match expr.eval(acc) {
                     Ok((result, env)) => {
                         assert_eq!(&result, expected, "Asserting {}: Expected {} at line {}", result, expected, line);

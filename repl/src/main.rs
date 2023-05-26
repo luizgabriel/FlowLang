@@ -26,7 +26,7 @@ fn main() {
 
     rl.load_history(HISTORY_PATH).unwrap_or_default();
 
-    let mut env = ValueEnvironment::new_with_std();
+    let mut env = ValueEnvironment::new().import_std();
 
     loop {
         let result = read(&mut rl)

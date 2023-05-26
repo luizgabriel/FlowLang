@@ -100,9 +100,8 @@ impl ValueEnvironment {
         }
     }
 
-    pub fn new_with_std() -> Self {
-        Self::new()
-            .set(Ident::new("+"), Value::builtin_2(BuiltInFunc::Add))
+    pub fn import_std(&self) -> Self {
+        self.set(Ident::new("+"), Value::builtin_2(BuiltInFunc::Add))
             .set(Ident::new("-"), Value::builtin_2(BuiltInFunc::Sub))
             .set(Ident::new("*"), Value::builtin_2(BuiltInFunc::Mul))
             .set(Ident::new("/"), Value::builtin_2(BuiltInFunc::Div))
