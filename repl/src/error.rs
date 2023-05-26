@@ -1,6 +1,7 @@
-use lang::{evaluation::EvalError, parsing::ParseError};
 use rustyline::error::ReadlineError;
 use thiserror::Error;
+use lang::evaluation::error::EvalError;
+use lang::parsing::error::ParseError;
 
 #[derive(Error, Debug)]
 pub enum REPLError {

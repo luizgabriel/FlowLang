@@ -1,9 +1,9 @@
 macro_rules! assert_evals {
     ($($input:expr => $expected:expr),*) => {
-        use lang::evaluation::ValueEnvironment;
-        use lang::evaluation::Value;
+        use lang::evaluation::env::ValueEnvironment;
+        use lang::evaluation::data::Value;
+        use lang::evaluation::Evaluator;
         use lang::parsing::parse_expr;
-        use lang::core::Evaluator;
 
         let pairs: Vec<(&'static str, Value)> = vec![$(($input, $expected)),*];
         pairs
@@ -27,7 +27,7 @@ macro_rules! assert_evals {
 #[test]
 fn test_const_definition() {
     assert_evals! {
-        "k = 5" => Value::Unit(),
+        "k = 5" => Value::Unit,
         "k" => Value::Int32(5)
     }
 }
@@ -39,7 +39,7 @@ fn test_bultins() {
         "10 + 50" => Value::Int32(60),
         "10 - 50" => Value::Int32(-40),
         "10 / 2" => Value::Int32(5),
-        "compare = equalUpTo 0.0001" => Value::Unit(),
+        "compare = equalUpTo 0.0001" => Value::Unit,
         "compare (5.0 / 2.0) 2.5" => Value::Bool(true),
         "compare (1.1 + 2.2 - 5.0) -1.7" => Value::Bool(true)
     }
@@ -48,7 +48,7 @@ fn test_bultins() {
 #[test]
 fn test_lambda() {
     assert_evals! {
-        "f = (x -> x + 1)" => Value::Unit(),
+        "f = (x -> x + 1)" => Value::Unit,
         "f 5" => Value::Int32(6)
     }
 }
@@ -56,8 +56,8 @@ fn test_lambda() {
 #[test]
 fn test_function_declaration() {
     assert_evals! {
-        "square x = x * x" => Value::Unit(),
-        "hypotenuse x y = sqrt (square x + square y)" => Value::Unit(),
+        "square x = x * x" => Value::Unit,
+        "hypotenuse x y = sqrt (square x + square y)" => Value::Unit,
         "hypotenuse 3 4" => Value::Float32(5.0)
     }
 }
@@ -65,8 +65,8 @@ fn test_function_declaration() {
 #[test]
 fn test_pipe_operator() {
     assert_evals! {
-        "f = (+) 1" => Value::Unit(),
-        "g = (*) 2" => Value::Unit(),
+        "f = (+) 1" => Value::Unit,
+        "g = (*) 2" => Value::Unit,
         "5 |> f |> g" => Value::Int32(12)
     }
 }
@@ -74,8 +74,8 @@ fn test_pipe_operator() {
 #[test]
 fn test_string_concatenation() {
     assert_evals! {
-        "s = \"foo\"" => Value::Unit(),
-        "t = \"bar\"" => Value::Unit(),
+        "s = \"foo\"" => Value::Unit,
+        "t = \"bar\"" => Value::Unit,
         "s ++ t" => Value::String("foobar".to_string())
     }
 }

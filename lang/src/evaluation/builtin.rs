@@ -1,7 +1,7 @@
 use crate::{
-    core::{Environment, Evaluator},
     evaluation::{EvalError, Value, ValueEnvironment},
 };
+use crate::evaluation::{Environment, Evaluator};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BuiltInFunc {
@@ -149,9 +149,9 @@ fn eval_pow(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalErr
 }
 
 impl Evaluator for BuiltInFunc {
+    type Output = Value;
     type Context = ValueEnvironment;
     type Error = EvalError;
-    type Output = Value;
 
     fn eval(&self, env: ValueEnvironment) -> Result<(Self::Output, Self::Context), Self::Error> {
         match self {
