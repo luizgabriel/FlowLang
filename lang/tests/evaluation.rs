@@ -3,7 +3,7 @@ macro_rules! assert_evals {
         use lang::parsing::parse;
         use lang::evaluation::ValueEnvironment;
         use lang::evaluation::Value;
-        use lang::evaluation::Evaluator;
+        use lang::core::Evaluator;
 
         let pairs: Vec<(&'static str, Value)> = vec![$(($input, $expected)),*];
         pairs

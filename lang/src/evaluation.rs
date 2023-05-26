@@ -3,6 +3,7 @@ use thiserror::Error;
 
 use crate::{
     builtin::BuiltInFunc,
+    core::{Environment, Evaluator},
     params,
     parsing::{parse, Expr, Ident, ParamsList},
 };
@@ -60,9 +61,9 @@ macro_rules! define_value_conversion {
             }
         }
 
-        impl Into<Value> for $native_type {
-            fn into(self) -> Value {
-                Value::$type(self)
+        impl From<$native_type> for Value {
+            fn from(value: $native_type) -> Self {
+                Value::$type(value)
             }
         }
     };
@@ -73,44 +74,7 @@ define_value_conversion!(Float32, f32);
 define_value_conversion!(Bool, bool);
 define_value_conversion!(String, String);
 
-pub trait Environment: Sized + Clone {
-    type Value;
-
-    fn get(&self, identifier: &Ident) -> Option<&Self::Value>;
-    fn set(&self, identifier: Ident, value: Self::Value) -> Self;
-
-    fn eval<T, E>(&self, evaluator: T) -> Result<(Self::Value, Self), E>
-    where
-        T: Evaluator<Context = Self, Output = Self::Value, Error = E>,
-    {
-        let (value, next_env) = evaluator.eval(self.clone())?;
-        Ok((value, next_env))
-    }
-
-    fn force_eval<T, E>(&self, evaluator: T) -> Self
-    where
-        T: Evaluator<Context = Self, Output = Self::Value, Error = E>,
-        E: std::fmt::Debug,
-    {
-        self.eval(evaluator)
-            .expect("Could not evaluate expression")
-            .1
-    }
-
-    fn pure<E>(&self, value: Self::Value) -> Result<(Self::Value, Self), E> {
-        Ok((value, self.clone()))
-    }
-}
-
-pub trait Evaluator {
-    type Output;
-    type Context;
-    type Error;
-
-    fn eval(&self, context: Self::Context) -> Result<(Self::Output, Self::Context), Self::Error>;
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ValueEnvironment {
     variables: HashTrieMap<Ident, Value>,
 }
@@ -152,6 +116,8 @@ impl ValueEnvironment {
             .set(Ident::new("sqrt"), Value::builtin_1(BuiltInFunc::Sqrt))
             .set(Ident::new("pow"), Value::builtin_2(BuiltInFunc::Pow))
             .force_eval(parse("equalUpTo epsilon x y = abs (x - y) < epsilon").unwrap())
+            .force_eval(parse("max x y = if x > y then x else y").unwrap())
+            .force_eval(parse("min x y = if x < y then x else y").unwrap())
             .force_eval(parse("(|>) a f = f a").unwrap())
             .force_eval(parse("(>>) f g = x -> g (f x)").unwrap())
             .force_eval(parse("(<<) f g = x -> f (g x)").unwrap())
@@ -187,14 +153,14 @@ impl Evaluator for Expr {
     fn eval(&self, env: Self::Context) -> Result<(Self::Output, Self::Context), Self::Error> {
         match self {
             Expr::Unit => env.pure(Value::Unit()),
-            Expr::Bool(value) => env.pure(value.clone().into()),
-            Expr::Int32(value) => env.pure(value.clone().into()),
-            Expr::Float32(value) => env.pure(value.clone().into()),
+            Expr::Bool(value) => env.pure((*value).into()),
+            Expr::Int32(value) => env.pure((*value).into()),
+            Expr::Float32(value) => env.pure((*value).into()),
             Expr::String(value) => env.pure(value.clone().into()),
 
             Expr::Identifier(ident) => {
                 let value = env
-                    .get(&ident)
+                    .get(ident)
                     .ok_or_else(|| EvalError::UnboundIdentifier(ident.clone()))?;
 
                 env.pure(value.clone())
@@ -211,14 +177,14 @@ impl Evaluator for Expr {
             }
 
             Expr::ConstantDefinition { name, expr } => {
-                let (value, env) = Self::eval(&expr, env)?;
+                let (value, env) = Self::eval(expr, env)?;
 
                 Ok((Value::Unit(), env.set(name.clone(), value)))
             }
 
             Expr::FunctionApplication(lhs, rhs) => {
-                let (lhs, env) = Self::eval(&lhs, env)?;
-                let (rhs, env) = Self::eval(&rhs, env)?;
+                let (lhs, env) = Self::eval(lhs, env)?;
+                let (rhs, env) = Self::eval(rhs, env)?;
 
                 match lhs {
                     Value::BuiltInFunction {
@@ -227,7 +193,7 @@ impl Evaluator for Expr {
                         scope,
                     } => {
                         let (param, rest) = params.split_first().unwrap();
-                        let scope = scope.clone().set(param.clone(), rhs);
+                        let scope = scope.set(param, rhs);
 
                         if rest.is_empty() {
                             let (value, _) = name.eval(scope)?;
@@ -247,7 +213,7 @@ impl Evaluator for Expr {
                         scope,
                     } => {
                         let (param, rest) = params.split_first().unwrap();
-                        let scope = scope.clone().set(param.clone(), rhs);
+                        let scope = scope.set(param, rhs);
 
                         if rest.is_empty() {
                             let (result, _) = Self::eval(&body, scope)?;
@@ -255,7 +221,7 @@ impl Evaluator for Expr {
                         }
 
                         env.pure(Value::Function {
-                            params: rest.iter().cloned().collect(),
+                            params: rest,
                             body,
                             scope,
                         })
@@ -280,12 +246,12 @@ impl Evaluator for Expr {
                 then,
                 otherwise,
             } => {
-                let (condition, env) = Self::eval(&condition, env)?;
+                let (condition, env) = Self::eval(condition, env)?;
 
                 if condition.try_into()? {
-                    Self::eval(&then, env)
+                    Self::eval(then, env)
                 } else {
-                    Self::eval(&otherwise, env)
+                    Self::eval(otherwise, env)
                 }
             }
         }

@@ -1,4 +1,7 @@
-use crate::evaluation::{Environment, EvalError, Evaluator, Value, ValueEnvironment};
+use crate::{
+    core::{Environment, Evaluator},
+    evaluation::{EvalError, Value, ValueEnvironment},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BuiltInFunc {
@@ -110,7 +113,7 @@ fn eval_abs(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalErr
 }
 
 fn eval_sqrt(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
-    let x = env.get(&"x".into()).unwrap();
+    let x: &Value = env.get(&"x".into()).unwrap();
 
     match x {
         Value::Int32(x) => env.pure((*x as f32).sqrt().into()),

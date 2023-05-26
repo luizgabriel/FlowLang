@@ -5,33 +5,33 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum REPLError {
     #[error("Readline error: {0}")]
-    ReadlineError(String),
+    Readline(String),
 
     #[error("Parse error: {0}")]
-    ParseError(String),
+    Parse(String),
 
     #[error("Evaluation error: {0}")]
-    EvaluationError(String),
+    Evaluation(String),
 }
 
-impl<'a> Into<REPLError> for ParseError<'a> {
-    fn into(self) -> REPLError {
-        REPLError::ParseError(self.to_string())
+impl<'a> From<ParseError<'a>> for REPLError {
+    fn from(val: ParseError<'a>) -> Self {
+        REPLError::Parse(val.to_string())
     }
 }
 
-impl Into<REPLError> for EvalError {
-    fn into(self) -> REPLError {
-        REPLError::EvaluationError(self.to_string())
+impl From<EvalError> for REPLError {
+    fn from(val: EvalError) -> Self {
+        REPLError::Evaluation(val.to_string())
     }
 }
 
-impl Into<REPLError> for ReadlineError {
-    fn into(self) -> REPLError {
-        match self {
-            ReadlineError::Interrupted => REPLError::ReadlineError("CTRL-C".to_string()),
-            ReadlineError::Eof => REPLError::ReadlineError("CTRL-D".to_string()),
-            err => REPLError::ReadlineError(err.to_string()),
+impl From<ReadlineError> for REPLError {
+    fn from(val: ReadlineError) -> Self {
+        match val {
+            ReadlineError::Interrupted => REPLError::Readline("CTRL-C".to_string()),
+            ReadlineError::Eof => REPLError::Readline("CTRL-D".to_string()),
+            err => REPLError::Readline(err.to_string()),
         }
     }
 }

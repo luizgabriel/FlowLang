@@ -42,6 +42,10 @@ impl ParamsList {
         ParamsList { params }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.params.is_empty()
+    }
+
     pub fn len(&self) -> usize {
         self.params.len()
     }
@@ -54,8 +58,9 @@ impl ParamsList {
         self.params.iter()
     }
 
-    pub fn split_first(&self) -> Option<(&Ident, &[Ident])> {
-        self.params.split_first()
+    pub fn split_first(&self) -> Option<(Ident, ParamsList)> {
+        let (head, tail) = self.params.split_first()?;
+        Some((head.clone(), Self::new(tail.to_vec())))
     }
 }
 
@@ -217,7 +222,7 @@ where
     ));
 
     //Dont allow keywords "if", "then" and "else"
-    const KEYWORDS: [&'static str; 3] = ["if", "then", "else"];
+    const KEYWORDS: [&str; 3] = ["if", "then", "else"];
     let identifier_except_keywords = blacklist(identifier, &KEYWORDS);
 
     context("identifier", map(identifier_except_keywords, Ident::new))(input)
@@ -490,7 +495,7 @@ fn map_nom_error<'a>(
     }
 }
 
-fn assert_parsed_full<'a>((remainder, expr): (&'a str, Expr)) -> Result<Expr, ParseError<'a>> {
+fn assert_parsed_full((remainder, expr): (&str, Expr)) -> Result<Expr, ParseError<'_>> {
     if str::is_empty(remainder) {
         Ok(expr)
     } else {

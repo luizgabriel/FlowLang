@@ -3,7 +3,8 @@ mod error;
 use colored::Colorize;
 use error::REPLError;
 use lang::{
-    evaluation::{EvalError, Evaluator, ValueEnvironment},
+    core::Evaluator,
+    evaluation::{EvalError, Value, ValueEnvironment},
     parsing::{parse, ParseError},
 };
 use rustyline::{error::ReadlineError, Editor};
@@ -35,16 +36,16 @@ fn main() {
 
         match result {
             Ok((value, next_env)) => {
-                println!("{}", value);
+                match value {
+                    Value::Unit() => (),
+                    _ => println!("{}", value),
+                }
                 env = next_env;
             }
             Err(err) => {
                 eprintln!("{}", err);
-                match err {
-                    REPLError::ReadlineError(_) => {
-                        break;
-                    }
-                    _ => {}
+                if let REPLError::Readline(_) = err {
+                    break;
                 }
             }
         }
