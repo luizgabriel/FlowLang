@@ -5,7 +5,7 @@ use crate::{
     builtin::BuiltInFunc,
     core::{Environment, Evaluator},
     params,
-    parsing::{parse, Expr, Ident, ParamsList},
+    parsing::{parse_module, Expr, Ident, Module, ParamsList},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -101,6 +101,18 @@ impl ValueEnvironment {
     }
 
     pub fn import_std(&self) -> Self {
+        let stdlib = parse_module(
+            r#"
+            equalUpTo epsilon x y = abs (x - y) < epsilon
+            max x y = if x > y then x else y
+            min x y = if x < y then x else y
+            (|>) a f = f a
+            (>>) f g = x -> g (f x)
+            (<<) f g = x -> f (g x)
+        "#,
+        )
+        .expect("Could not parse Standard Library");
+
         self.set(Ident::new("+"), Value::builtin_2(BuiltInFunc::Add))
             .set(Ident::new("-"), Value::builtin_2(BuiltInFunc::Sub))
             .set(Ident::new("*"), Value::builtin_2(BuiltInFunc::Mul))
@@ -114,12 +126,9 @@ impl ValueEnvironment {
             .set(Ident::new("abs"), Value::builtin_1(BuiltInFunc::Abs))
             .set(Ident::new("sqrt"), Value::builtin_1(BuiltInFunc::Sqrt))
             .set(Ident::new("pow"), Value::builtin_2(BuiltInFunc::Pow))
-            .force_eval(parse("equalUpTo epsilon x y = abs (x - y) < epsilon").unwrap())
-            .force_eval(parse("max x y = if x > y then x else y").unwrap())
-            .force_eval(parse("min x y = if x < y then x else y").unwrap())
-            .force_eval(parse("(|>) a f = f a").unwrap())
-            .force_eval(parse("(>>) f g = x -> g (f x)").unwrap())
-            .force_eval(parse("(<<) f g = x -> f (g x)").unwrap())
+            .eval(stdlib)
+            .expect("Could not evaluate Standard Library")
+            .1
     }
 }
 
@@ -254,6 +263,19 @@ impl Evaluator for Expr {
                 }
             }
         }
+    }
+}
+
+impl Evaluator for Module {
+    type Output = Value;
+    type Context = ValueEnvironment;
+    type Error = EvalError;
+
+    fn eval(&self, env: Self::Context) -> Result<(Self::Output, Self::Context), Self::Error> {
+        self.iter().fold(Ok((Value::Unit(), env)), |acc, expr| {
+            let (_, env) = acc?;
+            expr.eval(env)
+        })
     }
 }
 

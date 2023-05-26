@@ -14,8 +14,8 @@ pub enum REPLError {
     Evaluation(String),
 }
 
-impl<'a> From<ParseError<'a>> for REPLError {
-    fn from(val: ParseError<'a>) -> Self {
+impl From<ParseError> for REPLError {
+    fn from(val: ParseError) -> Self {
         REPLError::Parse(val.to_string())
     }
 }

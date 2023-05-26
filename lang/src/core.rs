@@ -14,16 +14,6 @@ pub trait Environment: Sized + Clone {
         Ok((value, next_env))
     }
 
-    fn force_eval<T, E>(&self, evaluator: T) -> Self
-    where
-        T: Evaluator<Context = Self, Output = Self::Value, Error = E>,
-        E: std::fmt::Debug,
-    {
-        self.eval(evaluator)
-            .expect("Could not evaluate expression")
-            .1
-    }
-
     fn pure<E>(&self, value: Self::Value) -> Result<(Self::Value, Self), E> {
         Ok((value, self.clone()))
     }

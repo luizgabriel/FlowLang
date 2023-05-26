@@ -2,7 +2,7 @@ use lang::parsing::Expr;
 
 macro_rules! assert_parse {
     ($input:expr, $expected:expr) => {
-        let expr = lang::parsing::parse($input).unwrap();
+        let expr = lang::parsing::parse_expr($input).unwrap();
         assert_eq!(expr, $expected);
     };
 }

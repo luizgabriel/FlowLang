@@ -5,7 +5,7 @@ use error::REPLError;
 use lang::{
     core::Evaluator,
     evaluation::{EvalError, Value, ValueEnvironment},
-    parsing::{parse, ParseError},
+    parsing::{parse_expr, ParseError},
 };
 use rustyline::{error::ReadlineError, Editor};
 
@@ -31,7 +31,7 @@ fn main() {
     loop {
         let result = read(&mut rl)
             .map_err(ReadlineError::into)
-            .and_then(|input| parse(&input).map_err(ParseError::into))
+            .and_then(|input| parse_expr(&input).map_err(ParseError::into))
             .and_then(|expr| expr.eval(env.clone()).map_err(EvalError::into));
 
         match result {

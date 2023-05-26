@@ -6,12 +6,14 @@ use std::{
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{alpha1, alphanumeric1, digit1, multispace0, one_of},
+    character::complete::{
+        alpha1, alphanumeric1, digit1, multispace0, multispace1, one_of, space0,
+    },
     combinator::{map, map_res, opt, recognize, value, verify},
-    error::{context, ContextError, FromExternalError},
-    multi::{many0_count, many1},
-    sequence::{delimited, pair, separated_pair, tuple},
-    IResult, Parser,
+    error::{context, convert_error, ContextError, FromExternalError},
+    multi::{many0_count, many1, separated_list0},
+    sequence::{delimited, pair, preceded, separated_pair, tuple},
+    AsChar, Compare, IResult, InputLength, InputTake, InputTakeAtPosition,
 };
 use thiserror::Error;
 
@@ -29,6 +31,12 @@ impl Ident {
 impl From<&str> for Ident {
     fn from(name: &str) -> Self {
         Ident::new(name)
+    }
+}
+
+impl std::fmt::Display for Ident {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -168,48 +176,95 @@ impl Expr {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Module {
+    expressions: Vec<Expr>,
+}
+
+impl Module {
+    pub fn new(expressions: Vec<Expr>) -> Self {
+        Module { expressions }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Expr> {
+        self.expressions.iter()
+    }
+}
+
+impl IntoIterator for Module {
+    type Item = Expr;
+    type IntoIter = <Vec<Expr> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.expressions.into_iter()
+    }
+}
+
+impl FromIterator<Expr> for Module {
+    fn from_iter<T: IntoIterator<Item = Expr>>(iter: T) -> Self {
+        Module::new(iter.into_iter().collect())
+    }
+}
+
 #[derive(Error, Debug)]
-pub enum ParseError<'a> {
-    #[error("Expression not fully parsed: {0}, Remaining: \"{1}\"")]
-    ExpressionNotFullyParsed(Expr, &'a str),
+pub enum ParseError {
+    #[error("Expression not fully parsed. Remaining: \"{0}\"")]
+    NotFullyParsed(String),
 
-    #[error("Invalid expression: {}", nom::error::convert_error(*.0, .1.clone()))]
-    InvalidExpression(&'a str, nom::error::VerboseError<&'a str>),
-
-    #[error("Incomplete input: {0}\n{carret:>column$}", carret = "^", column = .1)]
-    IncompleteInput(&'a str, usize),
-
-    #[error("Failed to parse expression: {}", nom::error::convert_error(*.0, .1.clone()))]
-    Failure(&'a str, nom::error::VerboseError<&'a str>),
+    #[error("Failed to parse expression: {0}")]
+    Failed(String),
 }
 
-fn ws0<'a, F, O, E>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
-where
-    F: Parser<&'a str, O, E>,
-    E: nom::error::ParseError<&'a str>,
+pub trait FwError<I>:
+    nom::error::ParseError<I>
+    + ContextError<I>
+    + FromExternalError<I, ParseIntError>
+    + FromExternalError<I, ParseFloatError>
 {
-    delimited(multispace0, inner, multispace0)
 }
 
-fn paren<'a, O, E, F>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
+impl<I, T> FwError<I> for T where
+    T: nom::error::ParseError<I>
+        + ContextError<I>
+        + FromExternalError<I, ParseIntError>
+        + FromExternalError<I, ParseFloatError>
+{
+}
+
+fn ws0<I, O, E, F>(inner: F) -> impl FnMut(I) -> IResult<I, O, E>
 where
-    F: Parser<&'a str, O, E>,
-    E: nom::error::ParseError<&'a str>,
+    I: InputTakeAtPosition,
+    <I as InputTakeAtPosition>::Item: AsChar + Clone,
+    F: nom::Parser<I, O, E>,
+    E: nom::error::ParseError<I>,
+{
+    preceded(space0, inner)
+}
+
+fn paren<I, O, E, F>(inner: F) -> impl FnMut(I) -> IResult<I, O, E>
+where
+    I: InputTake + InputLength + Compare<&'static str>,
+    F: nom::Parser<I, O, E>,
+    E: nom::error::ParseError<I>,
 {
     delimited(tag("("), inner, tag(")"))
 }
 
-fn blacklist<'o, I, O, E, F>(
+fn blacklist<'o, I, O, B, K, E, F>(
     parser: F,
-    blacklist: &'o [O],
+    blacklist: B,
 ) -> impl FnMut(I) -> IResult<I, O, E> + 'o
 where
     I: Clone + 'o,
-    F: Parser<I, O, E> + 'o,
+    F: nom::Parser<I, O, E> + 'o,
     E: nom::error::ParseError<I> + 'o,
-    O: std::cmp::PartialEq,
+    O: 'o,
+    B: IntoIterator<Item = &'o K> + Clone + 'o,
+    K: std::cmp::PartialEq<O> + 'o,
 {
-    verify(parser, |result| !blacklist.contains(result))
+    verify(parser, move |result| {
+        !blacklist.clone().into_iter().any(|k| k == result)
+    })
 }
 
 fn fw_identifier<'a, E>(input: &'a str) -> IResult<&'a str, Ident, E>
@@ -225,7 +280,12 @@ where
     const KEYWORDS: [&str; 3] = ["if", "then", "else"];
     let identifier_except_keywords = blacklist(identifier, &KEYWORDS);
 
-    context("identifier", map(identifier_except_keywords, Ident::new))(input)
+    context(
+        "identifier",
+        map(identifier_except_keywords, |ident: &'a str| {
+            Ident::new(ident)
+        }),
+    )(input)
 }
 
 fn fw_operator<'a, E>(input: &'a str) -> IResult<&'a str, Ident, E>
@@ -251,9 +311,9 @@ where
     )(input)
 }
 
-fn fw_float<'a, T, E>(input: &'a str) -> IResult<&'a str, T, E>
+fn fw_float<'a, O, E>(input: &'a str) -> IResult<&'a str, O, E>
 where
-    T: FromStr<Err = ParseFloatError>,
+    O: FromStr<Err = ParseFloatError>,
     E: nom::error::ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseFloatError>,
@@ -272,10 +332,7 @@ where
 
 fn fw_literal<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: nom::error::ParseError<&'a str>
-        + ContextError<&'a str>
-        + FromExternalError<&'a str, ParseIntError>
-        + FromExternalError<&'a str, ParseFloatError>,
+    E: FwError<&'a str>,
 {
     let parse_unit = value(Expr::Unit, tag("()"));
     let parse_true = value(Expr::Bool(true), tag("true"));
@@ -299,10 +356,7 @@ where
 // Expr15 = literal | identifier | (operator)
 fn fw_expr15<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: nom::error::ParseError<&'a str>
-        + ContextError<&'a str>
-        + FromExternalError<&'a str, ParseIntError>
-        + FromExternalError<&'a str, ParseFloatError>,
+    E: FwError<&'a str>,
 {
     alt((
         ws0(fw_literal),
@@ -314,10 +368,7 @@ where
 // Expr14 = "(" Expr ")" | Expr15
 fn fw_expr14<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: nom::error::ParseError<&'a str>
-        + ContextError<&'a str>
-        + FromExternalError<&'a str, ParseIntError>
-        + FromExternalError<&'a str, ParseFloatError>,
+    E: FwError<&'a str>,
 {
     alt((ws0(paren(fw_expr)), fw_expr15))(input)
 }
@@ -326,10 +377,7 @@ where
 // Expr13 = Expr14 Expr14 Expr14 ...
 fn fw_expr13<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: nom::error::ParseError<&'a str>
-        + ContextError<&'a str>
-        + FromExternalError<&'a str, ParseIntError>
-        + FromExternalError<&'a str, ParseFloatError>,
+    E: FwError<&'a str>,
 {
     let fn_app = context(
         "function application",
@@ -345,10 +393,7 @@ where
 // Expr12 = Expr13 [ "Operator" Expr13 ]*
 fn fw_expr12<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: nom::error::ParseError<&'a str>
-        + ContextError<&'a str>
-        + FromExternalError<&'a str, ParseIntError>
-        + FromExternalError<&'a str, ParseFloatError>,
+    E: FwError<&'a str>,
 {
     let infix_op_fn_app = context(
         "infix operator function application",
@@ -379,10 +424,7 @@ where
 // Expr11 = (arg1 arg2 ... argN -> Expr12)
 fn fw_expr11<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: nom::error::ParseError<&'a str>
-        + ContextError<&'a str>
-        + FromExternalError<&'a str, ParseIntError>
-        + FromExternalError<&'a str, ParseFloatError>,
+    E: FwError<&'a str>,
 {
     let lambda = context(
         "lambda expression",
@@ -399,10 +441,7 @@ where
 // Expr10 = if Expr11 then Expr11 else Expr11
 fn fw_expr10<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: nom::error::ParseError<&'a str>
-        + ContextError<&'a str>
-        + FromExternalError<&'a str, ParseIntError>
-        + FromExternalError<&'a str, ParseFloatError>,
+    E: FwError<&'a str>,
 {
     let if_expr = context(
         "if expression",
@@ -427,10 +466,7 @@ where
 // Expr9 = (operator) arg1 arg2 ... argnN = Expr10
 fn fw_expr9<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: nom::error::ParseError<&'a str>
-        + ContextError<&'a str>
-        + FromExternalError<&'a str, ParseIntError>
-        + FromExternalError<&'a str, ParseFloatError>,
+    E: FwError<&'a str>,
 {
     let func_def = context(
         "function definition",
@@ -452,10 +488,7 @@ where
 // ident = Expr9
 fn fw_expr8<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: nom::error::ParseError<&'a str>
-        + ContextError<&'a str>
-        + FromExternalError<&'a str, ParseIntError>
-        + FromExternalError<&'a str, ParseFloatError>,
+    E: FwError<&'a str>,
 {
     let const_def = context(
         "constant variable definition",
@@ -469,48 +502,51 @@ where
 }
 
 // Expr0 = Expr8
-fn fw_expr<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+pub fn fw_expr<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
 where
-    E: nom::error::ParseError<&'a str>
-        + ContextError<&'a str>
-        + FromExternalError<&'a str, ParseIntError>
-        + FromExternalError<&'a str, ParseFloatError>,
+    E: FwError<&'a str>,
 {
     context("expr", fw_expr8)(input)
 }
 
-fn map_nom_error<'a>(
-    input: &'a str,
-) -> impl FnMut(nom::Err<nom::error::VerboseError<&'a str>>) -> ParseError<'a> {
-    move |err| match err {
-        nom::Err::Incomplete(needed) => ParseError::IncompleteInput(
-            input,
-            match needed {
-                nom::Needed::Unknown => 0,
-                nom::Needed::Size(n) => n.get(),
-            },
-        ),
-        nom::Err::Error(e) => ParseError::InvalidExpression(input, e),
-        nom::Err::Failure(e) => ParseError::Failure(input, e),
+pub fn fw_module<'a, E>(input: &'a str) -> IResult<&'a str, Module, E>
+where
+    E: FwError<&'a str>,
+{
+    let expr_block = delimited(
+        multispace0,
+        separated_list0(multispace1, fw_expr),
+        multispace0,
+    );
+
+    context("module", map(expr_block, Module::new))(input)
+}
+
+fn to_parse_error(
+    input: &str,
+) -> impl FnOnce(nom::Err<nom::error::VerboseError<&str>>) -> ParseError + '_ {
+    move |error| match error {
+        nom::Err::Incomplete(needed) => panic!("Incomplete Input: {:?}", needed),
+        nom::Err::Failure(e) | nom::Err::Error(e) => ParseError::Failed(convert_error(input, e)),
     }
 }
 
-fn assert_parsed_full((remainder, expr): (&str, Expr)) -> Result<Expr, ParseError<'_>> {
-    if str::is_empty(remainder) {
-        Ok(expr)
-    } else {
-        Err(ParseError::ExpressionNotFullyParsed(expr, remainder))
+fn assert_parsed_fully<T>(input: &str, value: T) -> Result<T, ParseError> {
+    if !input.is_empty() {
+        Err(ParseError::NotFullyParsed(input.to_owned()))
     }
+
+    Ok(value)
 }
 
-pub fn parse(input: &str) -> Result<Expr, ParseError> {
-    fw_expr::<nom::error::VerboseError<&str>>(input)
-        .map_err(map_nom_error(input))
-        .and_then(assert_parsed_full)
+pub fn parse_module(input: &str) -> Result<Module, ParseError> {
+    fw_module::<nom::error::VerboseError<_>>(input)
+        .map_err(to_parse_error(input))
+        .and_then(|(i, o)| assert_parsed_fully(i, o))
 }
 
-impl std::fmt::Display for Ident {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.0)
-    }
+pub fn parse_expr(input: &str) -> Result<Expr, ParseError> {
+    fw_expr::<nom::error::VerboseError<_>>(input)
+        .map_err(to_parse_error(input))
+        .and_then(|(i, o)| assert_parsed_fully(i, o))
 }

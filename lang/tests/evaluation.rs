@@ -1,14 +1,14 @@
 macro_rules! assert_evals {
     ($($input:expr => $expected:expr),*) => {
-        use lang::parsing::parse;
         use lang::evaluation::ValueEnvironment;
         use lang::evaluation::Value;
+        use lang::parsing::parse_expr;
         use lang::core::Evaluator;
 
         let pairs: Vec<(&'static str, Value)> = vec![$(($input, $expected)),*];
         pairs
             .iter()
-            .map(|(input, expected)| (parse(input).unwrap(), expected))
+            .map(|(input, expected)| (parse_expr(input).unwrap(), expected))
             .fold((ValueEnvironment::new().import_std(), 1), |(acc, line), (expr, expected)| -> (ValueEnvironment, usize) {
                 match expr.eval(acc) {
                     Ok((result, env)) => {
