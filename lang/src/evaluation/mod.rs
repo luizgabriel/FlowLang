@@ -1,62 +1,59 @@
-pub use crate::parsing::data::{Expr, Ident, Program};
+use std::{cell::RefCell, rc::Rc};
+
 pub use crate::evaluation::data::Value;
 use crate::evaluation::env::Environment;
 pub use crate::evaluation::env::ValueEnvironment;
 pub use crate::evaluation::error::EvalError;
 use crate::parsing::data::{Declaration, Statement};
+pub use crate::parsing::data::{Expr, Ident, Program};
 
 mod builtin;
 pub mod data;
+mod display;
 pub mod env;
 pub mod error;
-mod display;
 
 pub trait Evaluator {
-    type Output;
-    type Context;
-    type Error;
-
-    fn eval(&self, context: Self::Context) -> Result<(Self::Output, Self::Context), Self::Error>;
+    fn eval(&self, env: ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError>;
 }
 
 impl Evaluator for Declaration {
-    type Output = Value;
-    type Context = ValueEnvironment;
-    type Error = EvalError;
-
-    fn eval(&self, env: Self::Context) -> Result<(Self::Output, Self::Context), Self::Error> {
+    fn eval(&self, env: ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
         match self {
             Declaration::Constant { name, expr } => {
                 let (value, env) = expr.eval(env)?;
                 Ok((Value::Unit, env.set(name.clone(), value)))
             }
             Declaration::Function { name, params, body } => {
+                let scope = Rc::new(RefCell::new(env.clone()));
+
                 let function = Value::Function {
                     params: params.clone(),
                     body: body.clone(),
-                    scope: env.clone(),
+                    scope: scope.clone(),
                 };
-                Ok((Value::Unit, env.set(name.clone(), function)))
+
+                scope.replace(env.set(name.clone(), function));
+                let new_env = scope.borrow();
+
+                Ok((Value::Unit, new_env.clone()))
             }
         }
     }
 }
 
 impl Evaluator for Statement {
-    type Output = Value;
-    type Context = ValueEnvironment;
-    type Error = EvalError;
-
-    fn eval(&self, env: Self::Context) -> Result<(Self::Output, Self::Context), Self::Error> {
+    fn eval(&self, env: ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
         match self {
             Statement::Expression(expr) => expr.eval(env),
             Statement::Declaration(decl) => decl.eval(env),
-            Statement::LetBlock {
-                bindings,
-                body
-            } => {
+            Statement::LetBlock { bindings, body } => {
                 let initial_env = env.clone();
-                let (_, env) = bindings.iter().try_fold((Value::Unit, env), |(_, env), statement| statement.eval(env))?;
+                let (_, env) = bindings
+                    .iter()
+                    .try_fold((Value::Unit, env), |(_, env), statement| {
+                        statement.eval(env)
+                    })?;
                 let (value, _) = body.eval(env)?;
                 Ok((value, initial_env))
             }
@@ -65,11 +62,7 @@ impl Evaluator for Statement {
 }
 
 impl Evaluator for Expr {
-    type Output = Value;
-    type Context = ValueEnvironment;
-    type Error = EvalError;
-
-    fn eval(&self, env: Self::Context) -> Result<(Self::Output, Self::Context), Self::Error> {
+    fn eval(&self, env: ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
         match self {
             Expr::Unit => env.pure(Value::Unit),
             Expr::Bool(value) => env.pure((*value).into()),
@@ -89,7 +82,7 @@ impl Evaluator for Expr {
                 let function = Value::Function {
                     params: params.clone(),
                     body: Box::new(Statement::Expression(body.clone())),
-                    scope: env.clone(),
+                    scope: Rc::new(env.clone().into()),
                 };
 
                 env.pure(function)
@@ -126,7 +119,7 @@ impl Evaluator for Expr {
                         scope,
                     } => {
                         let (param, rest) = params.split_first().unwrap();
-                        let scope = scope.set(param, rhs);
+                        let scope = scope.borrow().set(param, rhs);
 
                         if rest.is_empty() {
                             let (result, _) = body.eval(scope)?;
@@ -136,7 +129,7 @@ impl Evaluator for Expr {
                         env.pure(Value::Function {
                             params: rest,
                             body,
-                            scope,
+                            scope: Rc::new(scope.into()),
                         })
                     }
 
@@ -152,9 +145,9 @@ impl Evaluator for Expr {
                 let (condition, env) = condition.eval(env)?;
 
                 if condition.try_into()? {
-                    Self::eval(then, env)
+                    then.eval(env)
                 } else {
-                    Self::eval(otherwise, env)
+                    otherwise.eval(env)
                 }
             }
         }
@@ -162,16 +155,10 @@ impl Evaluator for Expr {
 }
 
 impl Evaluator for Program {
-    type Output = Value;
-    type Context = ValueEnvironment;
-    type Error = EvalError;
-
-    fn eval(&self, env: Self::Context) -> Result<(Self::Output, Self::Context), Self::Error> {
+    fn eval(&self, env: ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
         self.iter().fold(Ok((Value::Unit, env)), |acc, expr| {
             let (_, env) = acc?;
             expr.eval(env)
         })
     }
 }
-
-

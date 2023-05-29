@@ -32,8 +32,8 @@ fn test_parse_identifier() {
 #[test]
 fn test_parse_literal() {
     assert_parse_expr!("()", Expr::Unit);
-    assert_parse_expr!("true", true.into());
-    assert_parse_expr!("false", false.into());
+    assert_parse_expr!("true", Expr::Bool(true));
+    assert_parse_expr!("false", Expr::Bool(false.into()));
     assert_parse_expr!("123", Expr::Int32(123));
     assert_parse_expr!("123.456", Expr::Float32(123.456));
     assert_parse_expr!("\"foo\"", Expr::String("foo".into()));
@@ -73,14 +73,14 @@ fn test_operator_function_application() {
 fn test_if_expr() {
     assert_parse_expr!(
         "if true then 1 else 2",
-        Expr::ife(true.into(), 1.into(), 2.into())
+        Expr::ife(Expr::Bool(true), Expr::Int32(1), Expr::Int32(2))
     );
     assert_parse_expr!(
         "if false then 1 else (if false then 2 else 3)",
         Expr::ife(
-            false.into(),
-            1.into(),
-            Expr::ife(false.into(), 2.into(), 3.into())
+            Expr::Bool(false),
+            Expr::Int32(1),
+            Expr::ife(Expr::Bool(false), Expr::Int32(2), Expr::Int32(3)).into()
         )
     );
 }
@@ -90,7 +90,10 @@ fn test_let_block() {
     assert_parse_statement!(
         "let x = 2 then x",
         Statement::block(
-            Bindings::new(vec![Declaration::constant(Ident::name("x"), 2.into()),]),
+            Bindings::new(vec![Declaration::constant(
+                Ident::name("x"),
+                Expr::Int32(2)
+            ),]),
             Expr::name("x")
         )
     );
@@ -98,7 +101,7 @@ fn test_let_block() {
         "let x = 3\n\ty = 4 then x + y",
         Statement::block(
             Bindings::new(vec![
-                Declaration::constant(Ident::name("x"), 3.into()),
+                Declaration::constant(Ident::name("x"), Expr::Int32(3)),
                 Declaration::constant(Ident::name("y"), 4.into()),
             ]),
             Expr::fnapp2(Expr::operator("+"), Expr::name("x"), Expr::name("y"))
@@ -126,7 +129,7 @@ fn test_let_block() {
                 Declaration::function(
                     Ident::name("times2"),
                     ParamsList::new(vec![Ident::name("x")]),
-                    Expr::fnapp2(Expr::operator("*"), 2.into(), Expr::name("x")).into()
+                    Expr::fnapp2(Expr::operator("*"), Expr::Int32(2), Expr::name("x")).into()
                 ),
             ]),
             Expr::fnapp2(

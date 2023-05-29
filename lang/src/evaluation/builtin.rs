@@ -21,8 +21,6 @@ pub enum BuiltInFunc {
     Pow,
 }
 
-
-
 fn eval_comparison(
     name: &BuiltInFunc,
     env: &ValueEnvironment,
@@ -146,11 +144,7 @@ fn eval_pow(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalErr
 }
 
 impl Evaluator for BuiltInFunc {
-    type Output = Value;
-    type Context = ValueEnvironment;
-    type Error = EvalError;
-
-    fn eval(&self, env: ValueEnvironment) -> Result<(Self::Output, Self::Context), Self::Error> {
+    fn eval(&self, env: ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
         match self {
             BuiltInFunc::Concat => eval_concat(&env),
             BuiltInFunc::Sqrt => eval_sqrt(&env),
