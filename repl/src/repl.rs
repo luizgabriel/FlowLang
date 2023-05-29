@@ -22,7 +22,7 @@ impl Validator for REPLHelper {
             Err(e) => {
                 match e {
                     ParseError::NotFullyParsed(_) => Ok(ValidationResult::Incomplete),
-                    ParseError::Failed(e) => Ok(ValidationResult::Invalid(Some(e.to_string()))),
+                    ParseError::Failed(e) => Ok(ValidationResult::Invalid(Some(e))),
                 }
             }
         }

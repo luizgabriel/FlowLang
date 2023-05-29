@@ -33,7 +33,7 @@ fn test_parse_identifier() {
 fn test_parse_literal() {
     assert_parse_expr!("()", Expr::Unit);
     assert_parse_expr!("true", Expr::Bool(true));
-    assert_parse_expr!("false", Expr::Bool(false.into()));
+    assert_parse_expr!("false", Expr::Bool(false));
     assert_parse_expr!("123", Expr::Int32(123));
     assert_parse_expr!("123.456", Expr::Float32(123.456));
     assert_parse_expr!("\"foo\"", Expr::String("foo".into()));
@@ -80,7 +80,7 @@ fn test_if_expr() {
         Expr::ife(
             Expr::Bool(false),
             Expr::Int32(1),
-            Expr::ife(Expr::Bool(false), Expr::Int32(2), Expr::Int32(3)).into()
+            Expr::ife(Expr::Bool(false), Expr::Int32(2), Expr::Int32(3))
         )
     );
 }

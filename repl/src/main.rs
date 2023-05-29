@@ -37,7 +37,7 @@ fn main() {
             Ok(value) => match value {
                     Value::Unit => {}
                     _ => {
-                        println!("{}", Colored::new(value).to_string());
+                        println!("{}", Colored::new(value));
                     }
                 }
             Err(err) => match err {
