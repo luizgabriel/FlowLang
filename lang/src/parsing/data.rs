@@ -3,7 +3,7 @@ use std::ops::Index;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ident {
     Name(String),
-    Operator(String)
+    Operator(String),
 }
 
 impl Ident {
@@ -37,7 +37,7 @@ impl ParamsList {
         self.params.get(index)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=&Ident> {
+    pub fn iter(&self) -> impl Iterator<Item = &Ident> {
         self.params.iter()
     }
 
@@ -57,7 +57,7 @@ impl IntoIterator for ParamsList {
 }
 
 impl FromIterator<Ident> for ParamsList {
-    fn from_iter<T: IntoIterator<Item=Ident>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = Ident>>(iter: T) -> Self {
         ParamsList::new(iter.into_iter().collect())
     }
 }
@@ -105,7 +105,7 @@ impl Bindings {
         Bindings { bindings }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=&Declaration> {
+    pub fn iter(&self) -> impl Iterator<Item = &Declaration> {
         self.bindings.iter()
     }
 
@@ -140,7 +140,7 @@ impl IntoIterator for Bindings {
 }
 
 impl FromIterator<Declaration> for Bindings {
-    fn from_iter<T: IntoIterator<Item=Declaration>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = Declaration>>(iter: T) -> Self {
         Bindings::new(iter.into_iter().collect())
     }
 }
@@ -149,10 +149,7 @@ impl FromIterator<Declaration> for Bindings {
 pub enum Statement {
     Expression(Box<Expr>),
     Declaration(Box<Declaration>),
-    LetBlock {
-        bindings: Bindings,
-        body: Box<Expr>,
-    },
+    LetBlock { bindings: Bindings, body: Box<Expr> },
 }
 
 impl Declaration {
@@ -190,11 +187,11 @@ impl Statement {
 }
 
 impl Expr {
-    pub fn ident_name(name: &str) -> Expr {
+    pub fn name(name: &str) -> Expr {
         Expr::Identifier(Ident::name(name))
     }
 
-    pub fn ident_op(op: &str) -> Expr {
+    pub fn operator(op: &str) -> Expr {
         Expr::Identifier(Ident::op(op))
     }
 
@@ -232,7 +229,7 @@ impl Program {
         Program { statements }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=&Statement> {
+    pub fn iter(&self) -> impl Iterator<Item = &Statement> {
         self.statements.iter()
     }
 }
@@ -247,7 +244,7 @@ impl IntoIterator for Program {
 }
 
 impl FromIterator<Statement> for Program {
-    fn from_iter<T: IntoIterator<Item=Statement>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = Statement>>(iter: T) -> Self {
         Program::new(iter.into_iter().collect())
     }
 }

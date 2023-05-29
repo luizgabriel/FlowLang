@@ -3,14 +3,14 @@ macro_rules! assert_eval {
         use lang::evaluation::env::ValueEnvironment;
         use lang::evaluation::data::Value;
         use lang::evaluation::Evaluator;
-        use lang::parsing::parse_expr;
+        use lang::parsing::parse_program;
 
         let pairs: Vec<(&'static str, Value)> = vec![$(($input, $expected)),*];
         pairs
             .iter()
-            .map(|(input, expected)| (parse_expr(input).unwrap(), expected))
-            .fold((ValueEnvironment::new().import_std(), 1), |(acc, line), (expr, expected)| -> (ValueEnvironment, usize) {
-                match expr.eval(acc) {
+            .map(|(input, expected)| (parse_program(input).unwrap(), expected))
+            .fold((ValueEnvironment::new().import_std(), 1), |(acc, line), (program, expected)| -> (ValueEnvironment, usize) {
+                match program.eval(acc) {
                     Ok((result, env)) => {
                         assert_eq!(&result, expected, "Asserting {}: Expected {} at line {}", result, expected, line);
                         (env, line + 1)
