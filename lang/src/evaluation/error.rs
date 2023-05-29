@@ -1,5 +1,6 @@
-use crate::evaluation::data::Value;
 use thiserror::Error;
+
+use crate::evaluation::data::Value;
 use crate::parsing::data::Ident;
 
 #[derive(Error, Debug)]

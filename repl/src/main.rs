@@ -1,12 +1,13 @@
 mod error;
 mod repl;
+mod colors;
 
 use colored::Colorize;
 use error::REPLError;
 
-use lang::evaluation::Evaluator;
-use lang::evaluation::data::Value;
-use lang::parsing::parse_module;
+use lang::evaluation::{Evaluator, Value};
+use lang::parsing::parse_program;
+use crate::colors::Colored;
 use crate::repl::REPLState;
 
 const HISTORY_PATH: &str = ".flow_history";
@@ -16,7 +17,7 @@ fn read_parse_eval(state: &mut REPLState) -> Result<Value, REPLError> {
         .readline(&"flow> ".green())
         .map_err(REPLError::from)?;
 
-    let expr = parse_module(&input).map_err(REPLError::from)?;
+    let expr = parse_program(&input).map_err(REPLError::from)?;
 
     let (value, next_env) = expr.eval(state.env.clone()).map_err(REPLError::from)?;
 
@@ -36,7 +37,7 @@ fn main() {
             Ok(value) => match value {
                     Value::Unit => {}
                     _ => {
-                        println!("{}", value);
+                        println!("{}", Colored::new(value).to_string());
                     }
                 }
             Err(err) => match err {

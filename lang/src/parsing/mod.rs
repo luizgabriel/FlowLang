@@ -1,13 +1,14 @@
+use nom::error::convert_error;
+
+use crate::parsing::combinators::{expr, program, statement};
+pub use crate::parsing::data::{Expr, Ident, ParamsList, Program, Statement, Declaration, Bindings};
+pub use crate::parsing::error::ParseError;
+
 mod combinators;
 pub mod data;
 mod display;
 pub mod error;
 mod string;
-
-use crate::parsing::combinators::{fw_expr, fw_module};
-use crate::parsing::data::{Expr, Module};
-use crate::parsing::error::ParseError;
-use nom::error::convert_error;
 
 fn to_parse_error(
     input: &str,
@@ -26,14 +27,20 @@ fn assert_parsed_fully<T>(input: &str, value: T) -> Result<T, ParseError> {
     }
 }
 
-pub fn parse_module(input: &str) -> Result<Module, ParseError> {
-    fw_module::<nom::error::VerboseError<_>>(input)
+pub fn parse_program(input: &str) -> Result<Program, ParseError> {
+    program::<nom::error::VerboseError<_>>(input)
+        .map_err(to_parse_error(input))
+        .and_then(|(i, o)| assert_parsed_fully(i, o))
+}
+
+pub fn parse_statement(input: &str) -> Result<Statement, ParseError> {
+    statement::<nom::error::VerboseError<_>>(input)
         .map_err(to_parse_error(input))
         .and_then(|(i, o)| assert_parsed_fully(i, o))
 }
 
 pub fn parse_expr(input: &str) -> Result<Expr, ParseError> {
-    fw_expr::<nom::error::VerboseError<_>>(input)
+    expr::<nom::error::VerboseError<_>>(input)
         .map_err(to_parse_error(input))
         .and_then(|(i, o)| assert_parsed_fully(i, o))
 }

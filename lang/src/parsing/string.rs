@@ -3,16 +3,16 @@ use nom::bytes::complete::{is_not, take_while_m_n};
 use nom::character::complete::{char, multispace1};
 use nom::combinator::{map, map_opt, map_res, value, verify};
 use nom::error::{FromExternalError, ParseError};
+use nom::IResult;
 use nom::multi::many0;
 use nom::sequence::{delimited, preceded};
-use nom::IResult;
 
 /// Parse a unicode sequence, of the form u{XXXX}, where XXXX is 1 to 6
 /// hexadecimal numerals. We will combine this later with parse_escaped_char
 /// to parse sequences like \u{00AC}.
 fn parse_unicode<'a, E>(input: &'a str) -> IResult<&'a str, char, E>
-where
-    E: ParseError<&'a str> + FromExternalError<&'a str, std::num::ParseIntError>,
+    where
+        E: ParseError<&'a str> + FromExternalError<&'a str, std::num::ParseIntError>,
 {
     let parse_hex = take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit());
     let parse_delimited_hex = preceded(char('u'), delimited(char('{'), parse_hex, char('}')));
@@ -23,8 +23,8 @@ where
 
 /// Parse an escaped character: \n, \t, \r, \u{00AC}, etc.
 fn parse_escaped_char<'a, E>(input: &'a str) -> IResult<&'a str, char, E>
-where
-    E: ParseError<&'a str> + FromExternalError<&'a str, std::num::ParseIntError>,
+    where
+        E: ParseError<&'a str> + FromExternalError<&'a str, std::num::ParseIntError>,
 {
     preceded(
         char('\\'),
@@ -69,8 +69,8 @@ enum StringFragment<'a> {
 /// Combine parse_literal, parse_escaped_whitespace, and parse_escaped_char
 /// into a StringFragment.
 fn parse_fragment<'a, E>(input: &'a str) -> IResult<&'a str, StringFragment<'a>, E>
-where
-    E: ParseError<&'a str> + FromExternalError<&'a str, std::num::ParseIntError>,
+    where
+        E: ParseError<&'a str> + FromExternalError<&'a str, std::num::ParseIntError>,
 {
     alt((
         map(parse_literal, StringFragment::Literal),
@@ -82,8 +82,8 @@ where
 /// Parse a string. Use a loop of parse_fragment and push all of the fragments
 /// into an output string.
 pub fn parse_string<'a, E>(input: &'a str) -> IResult<&'a str, String, E>
-where
-    E: ParseError<&'a str> + FromExternalError<&'a str, std::num::ParseIntError>,
+    where
+        E: ParseError<&'a str> + FromExternalError<&'a str, std::num::ParseIntError>,
 {
     let build_string = map(many0(parse_fragment), |fragments| {
         fragments

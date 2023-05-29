@@ -1,22 +1,17 @@
+use std::ops::Index;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Ident(pub(crate) String);
+pub enum Ident {
+    Name(String),
+    Operator(String)
+}
 
 impl Ident {
-    pub fn new(name: &str) -> Self {
-        Ident(name.to_string())
+    pub fn name(name: &str) -> Self {
+        Ident::Name(name.to_string())
     }
-}
-
-impl From<&str> for Ident {
-    fn from(name: &str) -> Self {
-        Ident::new(name)
-    }
-}
-
-impl std::fmt::Display for Ident {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{}", self.0)
+    pub fn op(op: &str) -> Self {
+        Ident::Operator(op.to_string())
     }
 }
 
@@ -42,7 +37,7 @@ impl ParamsList {
         self.params.get(index)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &Ident> {
+    pub fn iter(&self) -> impl Iterator<Item=&Ident> {
         self.params.iter()
     }
 
@@ -62,16 +57,9 @@ impl IntoIterator for ParamsList {
 }
 
 impl FromIterator<Ident> for ParamsList {
-    fn from_iter<T: IntoIterator<Item = Ident>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item=Ident>>(iter: T) -> Self {
         ParamsList::new(iter.into_iter().collect())
     }
-}
-
-#[macro_export]
-macro_rules! params {
-    ($($param:ident),+) => {
-        ParamsList::new(vec![$(Ident::new(stringify!($param))),*])
-    };
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -82,16 +70,7 @@ pub enum Expr {
     Float32(f32),
     String(String),
     Identifier(Ident),
-    ConstantDefinition {
-        name: Ident,
-        expr: Box<Expr>,
-    },
     FunctionApplication(Box<Expr>, Box<Expr>),
-    FunctionDefinition {
-        name: Ident,
-        params: ParamsList,
-        body: Box<Expr>,
-    },
     Lambda {
         params: ParamsList,
         body: Box<Expr>,
@@ -103,28 +82,128 @@ pub enum Expr {
     },
 }
 
-impl Expr {
-    pub fn ident(name: &str) -> Expr {
-        Expr::Identifier(Ident::new(name))
+#[derive(Debug, Clone, PartialEq)]
+pub enum Declaration {
+    Constant {
+        name: Ident,
+        expr: Box<Expr>,
+    },
+    Function {
+        name: Ident,
+        params: ParamsList,
+        body: Box<Statement>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Bindings {
+    bindings: Vec<Declaration>,
+}
+
+impl Bindings {
+    pub fn new(bindings: Vec<Declaration>) -> Self {
+        Bindings { bindings }
     }
 
-    pub fn constdef(name: Ident, value: Expr) -> Expr {
-        Expr::ConstantDefinition {
+    pub fn iter(&self) -> impl Iterator<Item=&Declaration> {
+        self.bindings.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.bindings.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.bindings.is_empty()
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Declaration> {
+        self.bindings.get(index)
+    }
+}
+
+impl Index<usize> for Bindings {
+    type Output = Declaration;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.bindings[index]
+    }
+}
+
+impl IntoIterator for Bindings {
+    type Item = Declaration;
+    type IntoIter = <Vec<Declaration> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.bindings.into_iter()
+    }
+}
+
+impl FromIterator<Declaration> for Bindings {
+    fn from_iter<T: IntoIterator<Item=Declaration>>(iter: T) -> Self {
+        Bindings::new(iter.into_iter().collect())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Statement {
+    Expression(Box<Expr>),
+    Declaration(Box<Declaration>),
+    LetBlock {
+        bindings: Bindings,
+        body: Box<Expr>,
+    },
+}
+
+impl Declaration {
+    pub fn constant(name: Ident, expr: Expr) -> Declaration {
+        Declaration::Constant {
             name,
-            expr: Box::new(value),
+            expr: Box::new(expr),
         }
     }
 
-    pub fn fndef(name: Ident, params: ParamsList, body: Expr) -> Expr {
-        Expr::FunctionDefinition {
+    pub fn function(name: Ident, params: ParamsList, body: Statement) -> Declaration {
+        Declaration::Function {
             name,
             params,
             body: Box::new(body),
         }
     }
+}
+
+impl Statement {
+    pub fn expr(expr: Expr) -> Statement {
+        Statement::Expression(Box::new(expr))
+    }
+
+    pub fn declaration(decl: Declaration) -> Statement {
+        Statement::Declaration(Box::new(decl))
+    }
+
+    pub fn block(bindings: Bindings, body: Expr) -> Statement {
+        Statement::LetBlock {
+            bindings,
+            body: Box::new(body),
+        }
+    }
+}
+
+impl Expr {
+    pub fn ident_name(name: &str) -> Expr {
+        Expr::Identifier(Ident::name(name))
+    }
+
+    pub fn ident_op(op: &str) -> Expr {
+        Expr::Identifier(Ident::op(op))
+    }
 
     pub fn fnapp(func: Expr, arg: Expr) -> Expr {
         Expr::FunctionApplication(Box::new(func), Box::new(arg))
+    }
+
+    pub fn fnapp2(func: Expr, lhs: Expr, rhs: Expr) -> Expr {
+        Self::fnapp(Self::fnapp(func, lhs), rhs)
     }
 
     pub fn lambda(params: ParamsList, body: Expr) -> Expr {
@@ -144,31 +223,52 @@ impl Expr {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Module {
-    expressions: Vec<Expr>,
+pub struct Program {
+    statements: Vec<Statement>,
 }
 
-impl Module {
-    pub fn new(expressions: Vec<Expr>) -> Self {
-        Module { expressions }
+impl Program {
+    pub fn new(statements: Vec<Statement>) -> Self {
+        Program { statements }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &Expr> {
-        self.expressions.iter()
+    pub fn iter(&self) -> impl Iterator<Item=&Statement> {
+        self.statements.iter()
     }
 }
 
-impl IntoIterator for Module {
-    type Item = Expr;
-    type IntoIter = <Vec<Expr> as IntoIterator>::IntoIter;
+impl IntoIterator for Program {
+    type Item = Statement;
+    type IntoIter = <Vec<Statement> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.expressions.into_iter()
+        self.statements.into_iter()
     }
 }
 
-impl FromIterator<Expr> for Module {
-    fn from_iter<T: IntoIterator<Item = Expr>>(iter: T) -> Self {
-        Module::new(iter.into_iter().collect())
+impl FromIterator<Statement> for Program {
+    fn from_iter<T: IntoIterator<Item=Statement>>(iter: T) -> Self {
+        Program::new(iter.into_iter().collect())
+    }
+}
+
+macro_rules! impl_from_for_expr {
+    ($ty:ty, $name:ident) => {
+        impl From<$ty> for Expr {
+            fn from(value: $ty) -> Self {
+                Expr::$name(value)
+            }
+        }
+    };
+}
+
+impl_from_for_expr!(i32, Int32);
+impl_from_for_expr!(f32, Float32);
+impl_from_for_expr!(bool, Bool);
+impl_from_for_expr!(String, String);
+
+impl From<Expr> for Statement {
+    fn from(expr: Expr) -> Self {
+        Statement::expr(expr)
     }
 }

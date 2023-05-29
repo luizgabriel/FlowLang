@@ -1,34 +1,37 @@
 use std::num::{ParseFloatError, ParseIntError};
 use std::str::FromStr;
+
 use nom::{AsChar, Compare, InputLength, InputTake, InputTakeAtPosition, IResult};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{alpha1, alphanumeric1, digit1, multispace0, multispace1, one_of, space0};
+use nom::character::complete::{alpha1, alphanumeric1, digit1, line_ending, multispace0, multispace1, one_of, space0};
 use nom::combinator::{map, map_res, opt, recognize, value, verify};
 use nom::error::{context, ContextError, FromExternalError};
-use nom::multi::{many0_count, many1, separated_list0};
-use nom::sequence::{delimited, pair, preceded, separated_pair, tuple};
-use crate::parsing::data::{Expr, Ident, Module, ParamsList};
+use nom::multi::{many0, many0_count, many1, separated_list0, separated_list1};
+use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple};
+use crate::parsing::Bindings;
+
+use crate::parsing::data::{Declaration, Expr, Ident, ParamsList, Program, Statement};
 use crate::parsing::error::FwError;
 use crate::parsing::string::parse_string;
 
 fn ws0<I, O, E, F>(inner: F) -> impl FnMut(I) -> IResult<I, O, E>
     where
-        I: InputTakeAtPosition,
+        I: InputTakeAtPosition + Clone,
         <I as InputTakeAtPosition>::Item: AsChar + Clone,
         F: nom::Parser<I, O, E>,
-        E: nom::error::ParseError<I>,
+        E: nom::error::ParseError<I> + ContextError<I>,
 {
-    preceded(space0, inner)
+    context("ws0",preceded(space0, inner))
 }
 
 fn paren<I, O, E, F>(inner: F) -> impl FnMut(I) -> IResult<I, O, E>
     where
-        I: InputTake + InputLength + Compare<&'static str>,
+        I: InputTake + InputLength + Compare<&'static str> + Clone,
         F: nom::Parser<I, O, E>,
-        E: nom::error::ParseError<I>,
+        E: nom::error::ParseError<I> + ContextError<I>,
 {
-    delimited(tag("("), inner, tag(")"))
+    context("parenthesis", delimited(tag("("), inner, tag(")")))
 }
 
 fn blacklist<'o, I, O, B, K, E, F>(
@@ -38,17 +41,18 @@ fn blacklist<'o, I, O, B, K, E, F>(
     where
         I: Clone + 'o,
         F: nom::Parser<I, O, E> + 'o,
-        E: nom::error::ParseError<I> + 'o,
+        E: nom::error::ParseError<I> + ContextError<I> + 'o,
         O: 'o,
-        B: IntoIterator<Item = &'o K> + Clone + 'o,
+        B: IntoIterator<Item=&'o K> + Clone + 'o,
         K: PartialEq<O> + 'o,
 {
+    context("blacklist",
     verify(parser, move |result| {
         !blacklist.clone().into_iter().any(|k| k == result)
-    })
+    }))
 }
 
-fn fw_identifier<'a, E>(input: &'a str) -> IResult<&'a str, Ident, E>
+fn identifier<'a, E>(input: &'a str) -> IResult<&'a str, Ident, E>
     where
         E: nom::error::ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -57,44 +61,44 @@ fn fw_identifier<'a, E>(input: &'a str) -> IResult<&'a str, Ident, E>
         many0_count(alt((alphanumeric1, tag("_")))),
     ));
 
-    //Dont allow keywords "if", "then" and "else"
-    const KEYWORDS: [&str; 3] = ["if", "then", "else"];
+    //Dont allow these keywords
+    const KEYWORDS: [&str; 4] = ["let", "if", "then", "else"];
     let identifier_except_keywords = blacklist(identifier, &KEYWORDS);
 
     context(
         "identifier",
         map(identifier_except_keywords, |ident: &'a str| {
-            Ident::new(ident)
+            Ident::name(ident)
         }),
     )(input)
 }
 
-fn fw_operator<'a, E>(input: &'a str) -> IResult<&'a str, Ident, E>
+fn operator<'a, E>(input: &'a str) -> IResult<&'a str, Ident, E>
     where
         E: nom::error::ParseError<&'a str> + ContextError<&'a str>,
 {
     context(
         "operator",
-        map(recognize(many1(one_of("!$%^&*-=+<>.~\\/|:"))), Ident::new),
+        map(recognize(many1(one_of("!$%^&*-=+<>.~\\/|:"))), Ident::op),
     )(input)
 }
 
-fn fw_nat<'a, T, E>(input: &'a str) -> IResult<&'a str, T, E>
+fn natural_number<'a, T, E>(input: &'a str) -> IResult<&'a str, T, E>
     where
-        T: FromStr<Err = ParseIntError>,
+        T: FromStr<Err=ParseIntError>,
         E: nom::error::ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseIntError>,
 {
     context(
-        "nat",
+        "natural_number",
         map_res(recognize(pair(opt(tag("-")), digit1)), str::parse),
     )(input)
 }
 
-fn fw_float<'a, O, E>(input: &'a str) -> IResult<&'a str, O, E>
+fn floating_number<'a, O, E>(input: &'a str) -> IResult<&'a str, O, E>
     where
-        O: FromStr<Err = ParseFloatError>,
+        O: FromStr<Err=ParseFloatError>,
         E: nom::error::ParseError<&'a str>
         + ContextError<&'a str>
         + FromExternalError<&'a str, ParseFloatError>,
@@ -111,15 +115,15 @@ fn fw_float<'a, O, E>(input: &'a str) -> IResult<&'a str, O, E>
     )(input)
 }
 
-fn fw_literal<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+fn literal<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
     where
         E: FwError<&'a str>,
 {
     let parse_unit = value(Expr::Unit, tag("()"));
     let parse_true = value(Expr::Bool(true), tag("true"));
     let parse_false = value(Expr::Bool(false), tag("false"));
-    let parse_float = map(fw_float, Expr::Float32);
-    let parse_nat = map(fw_nat, Expr::Int32);
+    let parse_float = map(floating_number, Expr::Float32);
+    let parse_nat = map(natural_number, Expr::Int32);
 
     context(
         "literal",
@@ -134,171 +138,205 @@ fn fw_literal<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
     )(input)
 }
 
-// Expr15 = literal | identifier | (operator)
-fn fw_expr15<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+// literal | identifier | (operator)
+fn expr_p15<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
     where
         E: FwError<&'a str>,
 {
-    alt((
-        ws0(fw_literal),
-        map(ws0(fw_identifier), Expr::Identifier),
-        map(ws0(paren(fw_operator)), Expr::Identifier),
-    ))(input)
+    context("literal or identifier or (operator)", alt((
+        ws0(literal),
+        map(ws0(identifier), Expr::Identifier),
+        map(ws0(paren(operator)), Expr::Identifier),
+    )))(input)
 }
 
-// Expr14 = "(" Expr ")" | Expr15
-fn fw_expr14<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+fn expr_p14<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
     where
         E: FwError<&'a str>,
 {
-    alt((ws0(paren(fw_expr)), fw_expr15))(input)
+    alt((ws0(paren(expr)), expr_p15))(input)
 }
 
 // Function Application
-// Expr13 = Expr14 Expr14 Expr14 ...
-fn fw_expr13<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+// Expr14 Expr14 Expr14 ...
+fn expr_p13<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
     where
         E: FwError<&'a str>,
 {
-    let fn_app = context(
+    alt((context(
         "function application",
-        map(tuple((fw_expr14, many1(fw_expr14))), |(head, tail)| {
+        map(tuple((expr_p14, many1(expr_p14))), |(head, tail)| {
             tail.into_iter().fold(head, Expr::fnapp)
         }),
-    );
-
-    alt((fn_app, fw_expr14))(input)
+    ), expr_p14))(input)
 }
 
 // Infix Operator Function Application
-// Expr12 = Expr13 [ "Operator" Expr13 ]*
-fn fw_expr12<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+// Expr13 [ "Operator" Expr13 ]*
+fn expr_p12<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
     where
         E: FwError<&'a str>,
 {
-    let infix_op_fn_app = context(
+    alt((context(
         "infix operator function application",
         map(
-            tuple((fw_expr13, many1(pair(ws0(fw_operator), fw_expr13)))),
+            tuple((expr_p13, many1(pair(ws0(operator), expr_p13)))),
             |(head, tail)| {
                 tail.into_iter().fold(head, |acc, (op, rhs)| {
                     Expr::fnapp(Expr::fnapp(Expr::Identifier(op), acc), rhs)
                 })
             },
         ),
-    );
-
-    alt((infix_op_fn_app, fw_expr13))(input)
+    ), expr_p13))(input)
 }
 
-fn fw_param_list<'a, E>(input: &'a str) -> IResult<&'a str, ParamsList, E>
+// Params List
+// arg1 arg2 ... argN
+fn param_list<'a, E>(input: &'a str) -> IResult<&'a str, ParamsList, E>
     where
         E: nom::error::ParseError<&'a str> + ContextError<&'a str>,
 {
     context(
         "parameter list",
-        map(many1(ws0(fw_identifier)), ParamsList::new),
+        map(many1(ws0(identifier)), ParamsList::new),
     )(input)
 }
 
 // (Lambda Expressions)
-// Expr11 = (arg1 arg2 ... argN -> Expr12)
-fn fw_expr11<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+// arg1 arg2 ... argN -> Expr12
+fn expr_p11<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
     where
         E: FwError<&'a str>,
 {
-    let lambda = context(
+    alt((context(
         "lambda expression",
         map(
-            tuple((fw_param_list, ws0(tag("->")), fw_expr12)),
+            tuple((param_list, ws0(tag("->")), expr_p12)),
             |(args, _, body)| Expr::lambda(args, body),
         ),
-    );
-
-    alt((lambda, fw_expr12))(input)
+    ), expr_p12))(input)
 }
 
 // If Expression
-// Expr10 = if Expr11 then Expr11 else Expr11
-fn fw_expr10<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+// if Expr11 then Expr11 else Expr11
+fn expr_p10<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
     where
         E: FwError<&'a str>,
 {
-    let if_expr = context(
+    alt((context(
         "if expression",
         map(
             tuple((
                 ws0(tag("if")),
-                fw_expr11,
+                expr_p11,
                 ws0(tag("then")),
-                fw_expr11,
+                expr_p11,
                 ws0(tag("else")),
-                fw_expr11,
+                expr_p11,
             )),
             |(_, condition, _, then, _, otherwise)| Expr::ife(condition, then, otherwise),
         ),
-    );
+    ), expr_p11))(input)
+}
 
-    alt((if_expr, fw_expr11))(input)
+// Root Expression
+pub fn expr<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+    where
+        E: FwError<&'a str>,
+{
+    context("expr", expr_p10)(input)
+}
+
+// Constant Definition
+// ident = Expr
+fn const_def<'a, E>(input: &'a str) -> IResult<&'a str, Declaration, E>
+    where
+        E: FwError<&'a str>,
+{
+    context(
+        "constant variable definition",
+        map(
+            tuple((ws0(identifier), ws0(tag("=")), expr)),
+            |(name, _, expr)| Declaration::constant(name, expr),
+        ),
+    )(input)
 }
 
 // Function Definition
-// Expr9 = ident arg1 arg2 ... argN = Expr10
-// Expr9 = (operator) arg1 arg2 ... argnN = Expr10
-fn fw_expr9<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+// ident arg1 arg2 ... argN = Expr
+// (operator) arg1 arg2 ... argnN = Expr
+fn func_def<'a, E>(input: &'a str) -> IResult<&'a str, Declaration, E>
     where
         E: FwError<&'a str>,
 {
-    let func_def = context(
+    context(
         "function definition",
         map(
             tuple((
-                ws0(alt((fw_identifier, paren(ws0(fw_operator))))),
-                fw_param_list,
+                ws0(alt((identifier, paren(ws0(operator))))),
+                param_list,
                 ws0(tag("=")),
-                fw_expr10,
+                statement,
             )),
-            |(name, args, _, body)| Expr::fndef(name, args, body),
+            |(name, args, _, body)| Declaration::function(name, args, body),
         ),
-    );
-
-    alt((func_def, fw_expr10))(input)
+    )(input)
 }
 
-// Constant Variable Definition
-// ident = Expr9
-fn fw_expr8<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+fn declaration<'a, E>(input: &'a str) -> IResult<&'a str, Declaration, E>
     where
         E: FwError<&'a str>,
 {
-    let const_def = context(
-        "constant variable definition",
+    context(
+        "declaration",
+        alt((
+            const_def,
+            func_def,
+        )),
+    )(input)
+}
+
+fn let_block<'a, E>(input: &'a str) -> IResult<&'a str, Statement, E>
+    where
+        E: FwError<&'a str>,
+{
+    context(
+        "statement let block",
         map(
-            tuple((ws0(fw_identifier), ws0(tag("=")), fw_expr9)),
-            |(name, _, expr)| Expr::constdef(name, expr),
+            tuple((
+                terminated(ws0(tag("let")), multispace0),
+                separated_list1(ws0(many0(line_ending)), declaration),
+                delimited(multispace0, tag("then"), multispace0),
+                expr,
+            )),
+            |(_, bindings, _, body)| Statement::block(Bindings::new(bindings), body),
         ),
-    );
-
-    alt((const_def, fw_expr9))(input)
+    )(input)
 }
 
-// Expr0 = Expr8
-pub fn fw_expr<'a, E>(input: &'a str) -> IResult<&'a str, Expr, E>
+pub fn statement<'a, E>(input: &'a str) -> IResult<&'a str, Statement, E>
     where
         E: FwError<&'a str>,
 {
-    context("expr", fw_expr8)(input)
+    context(
+        "statement",
+        preceded(multispace0, alt((
+            let_block,
+            map(declaration, Statement::declaration),
+            map(expr, Statement::expr),
+        ))),
+    )(input)
 }
 
-pub fn fw_module<'a, E>(input: &'a str) -> IResult<&'a str, Module, E>
+pub fn program<'a, E>(input: &'a str) -> IResult<&'a str, Program, E>
     where
         E: FwError<&'a str>,
 {
     let expr_block = delimited(
         multispace0,
-        separated_list0(multispace1, fw_expr),
+        separated_list0(multispace1, statement),
         multispace0,
     );
 
-    context("module", map(expr_block, Module::new))(input)
+    context("module", map(expr_block, Program::new))(input)
 }

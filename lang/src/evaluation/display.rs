@@ -1,8 +1,16 @@
-use std::fmt::{Display, Error, Formatter};
+use std::fmt::{Display, Formatter, Result};
+use crate::evaluation::builtin::BuiltInFunc;
+
 use crate::evaluation::data::Value;
 
+impl Display for BuiltInFunc {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "#BuiltIn-{:?}", self)
+    }
+}
+
 impl Display for Value {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Value::Unit => write!(f, "()"),
             Value::Bool(value) => write!(f, "{}", value),
@@ -13,13 +21,13 @@ impl Display for Value {
                 params,
                 body,
                 scope: _,
-            } => write!(f, "({} -> {})", params, body,),
+            } => write!(f, "({} -> {})", params, body),
             Value::BuiltInFunction {
                 name,
                 params,
                 scope: _,
             } => {
-                write!(f, "({} -> {})", params, name,)
+                write!(f, "({} -> {})", params, name)
             }
         }
     }

@@ -1,8 +1,7 @@
 use crate::evaluation::builtin::BuiltInFunc;
 use crate::evaluation::env::ValueEnvironment;
-use crate::params;
-use crate::parsing::data::{Expr, ParamsList, Ident};
 use crate::evaluation::EvalError;
+use crate::parsing::data::{ParamsList, Statement};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -13,7 +12,7 @@ pub enum Value {
     String(String),
     Function {
         params: ParamsList,
-        body: Box<Expr>,
+        body: Box<Statement>,
         scope: ValueEnvironment,
     },
     BuiltInFunction {
@@ -21,24 +20,6 @@ pub enum Value {
         params: ParamsList,
         scope: ValueEnvironment,
     },
-}
-
-impl Value {
-    pub fn builtin_1(name: BuiltInFunc) -> Value {
-        Value::BuiltInFunction {
-            name,
-            params: params!(x),
-            scope: ValueEnvironment::new(),
-        }
-    }
-
-    pub fn builtin_2(name: BuiltInFunc) -> Value {
-        Value::BuiltInFunction {
-            name,
-            params: params!(lhs, rhs),
-            scope: ValueEnvironment::new(),
-        }
-    }
 }
 
 macro_rules! define_value_conversion {

@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 colored = "2.0.0"
 lang = { path = "../lang" }
-rustyline = "10.1.1"
+rustyline = "11.0.0"
 thiserror = "1.0.38"

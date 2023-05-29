@@ -1,9 +1,20 @@
 use rpds::HashTrieMap;
+
 use crate::evaluation::builtin::BuiltInFunc;
-use crate::evaluation::Environment;
 use crate::evaluation::data::Value;
-use crate::parsing::data::Ident;
-use crate::parsing::parse_module;
+use crate::evaluation::Evaluator;
+use crate::parsing::{Ident, ParamsList, parse_program};
+
+pub trait Environment: Sized + Clone {
+    type Value;
+
+    fn get(&self, identifier: &Ident) -> Option<&Self::Value>;
+    fn set(&self, identifier: Ident, value: Self::Value) -> Self;
+
+    fn pure<E>(&self, value: Self::Value) -> Result<(Self::Value, Self), E> {
+        Ok((value, self.clone()))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ValueEnvironment {
@@ -24,6 +35,17 @@ impl Environment for ValueEnvironment {
     }
 }
 
+macro_rules! builtin {
+    // Receive Name and Args, *
+    ($name:ident : $($param:ident),*) => {
+        Value::BuiltInFunction {
+            name: BuiltInFunc::$name,
+            params: ParamsList::new(vec![$(Ident::name(stringify!($param))),*]),
+            scope: ValueEnvironment::new(),
+        }
+    };
+}
+
 impl ValueEnvironment {
     pub fn new() -> Self {
         Self {
@@ -32,32 +54,30 @@ impl ValueEnvironment {
     }
 
     pub fn import_std(&self) -> Self {
-        let stdlib = parse_module(
-            r#"
+        let builtins = self
+            .set(Ident::op("+"), builtin!(Add : lhs, rhs))
+            .set(Ident::op("-"), builtin!(Sub : lhs, rhs))
+            .set(Ident::op("*"), builtin!(Mul : lhs, rhs))
+            .set(Ident::op("/"), builtin!(Div : lhs, rhs))
+            .set(Ident::op("=="), builtin!(Eq : lhs, rhs))
+            .set(Ident::op(">"), builtin!(Gt : lhs, rhs))
+            .set(Ident::op(">="), builtin!(Gte : lhs, rhs))
+            .set(Ident::op("<"), builtin!(Lt : lhs, rhs))
+            .set(Ident::op("<="), builtin!(Lte : lhs, rhs))
+            .set(Ident::op("++"), builtin!(Concat : lhs, rhs))
+            .set(Ident::name("abs"), builtin!(Abs : x))
+            .set(Ident::name("sqrt"), builtin!(Sqrt : x))
+            .set(Ident::name("pow"), builtin!(Pow : x));
+
+        parse_program("
             equalUpTo epsilon x y = abs (x - y) < epsilon
             max x y = if x > y then x else y
             min x y = if x < y then x else y
             (|>) a f = f a
             (>>) f g = x -> g (f x)
             (<<) f g = x -> f (g x)
-        "#,
-        )
-            .expect("Could not parse Standard Library");
-
-        self.set(Ident::new("+"), Value::builtin_2(BuiltInFunc::Add))
-            .set(Ident::new("-"), Value::builtin_2(BuiltInFunc::Sub))
-            .set(Ident::new("*"), Value::builtin_2(BuiltInFunc::Mul))
-            .set(Ident::new("/"), Value::builtin_2(BuiltInFunc::Div))
-            .set(Ident::new("=="), Value::builtin_2(BuiltInFunc::Eq))
-            .set(Ident::new(">"), Value::builtin_2(BuiltInFunc::Gt))
-            .set(Ident::new(">="), Value::builtin_2(BuiltInFunc::Gte))
-            .set(Ident::new("<"), Value::builtin_2(BuiltInFunc::Lt))
-            .set(Ident::new("<="), Value::builtin_2(BuiltInFunc::Lte))
-            .set(Ident::new("++"), Value::builtin_2(BuiltInFunc::Concat))
-            .set(Ident::new("abs"), Value::builtin_1(BuiltInFunc::Abs))
-            .set(Ident::new("sqrt"), Value::builtin_1(BuiltInFunc::Sqrt))
-            .set(Ident::new("pow"), Value::builtin_2(BuiltInFunc::Pow))
-            .eval(stdlib)
+        ").expect("Could not parse Standard Library")
+            .eval(builtins)
             .expect("Could not evaluate Standard Library")
             .1
     }

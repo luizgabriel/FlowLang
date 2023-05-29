@@ -1,4 +1,4 @@
-macro_rules! assert_evals {
+macro_rules! assert_eval {
     ($($input:expr => $expected:expr),*) => {
         use lang::evaluation::env::ValueEnvironment;
         use lang::evaluation::data::Value;
@@ -26,15 +26,15 @@ macro_rules! assert_evals {
 
 #[test]
 fn test_const_definition() {
-    assert_evals! {
+    assert_eval! {
         "k = 5" => Value::Unit,
         "k" => Value::Int32(5)
     }
 }
 
 #[test]
-fn test_bultins() {
-    assert_evals! {
+fn test_builtin() {
+    assert_eval! {
         "5 * 2" => Value::Int32(10),
         "10 + 50" => Value::Int32(60),
         "10 - 50" => Value::Int32(-40),
@@ -47,7 +47,7 @@ fn test_bultins() {
 
 #[test]
 fn test_lambda() {
-    assert_evals! {
+    assert_eval! {
         "f = (x -> x + 1)" => Value::Unit,
         "f 5" => Value::Int32(6)
     }
@@ -55,7 +55,7 @@ fn test_lambda() {
 
 #[test]
 fn test_function_declaration() {
-    assert_evals! {
+    assert_eval! {
         "square x = x * x" => Value::Unit,
         "hypotenuse x y = sqrt (square x + square y)" => Value::Unit,
         "hypotenuse 3 4" => Value::Float32(5.0)
@@ -64,7 +64,7 @@ fn test_function_declaration() {
 
 #[test]
 fn test_pipe_operator() {
-    assert_evals! {
+    assert_eval! {
         "f = (+) 1" => Value::Unit,
         "g = (*) 2" => Value::Unit,
         "5 |> f |> g" => Value::Int32(12)
@@ -73,7 +73,7 @@ fn test_pipe_operator() {
 
 #[test]
 fn test_string_concatenation() {
-    assert_evals! {
+    assert_eval! {
         "s = \"foo\"" => Value::Unit,
         "t = \"bar\"" => Value::Unit,
         "s ++ t" => Value::String("foobar".to_string())

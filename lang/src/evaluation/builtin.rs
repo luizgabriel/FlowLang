@@ -2,6 +2,7 @@ use crate::{
     evaluation::{EvalError, Value, ValueEnvironment},
 };
 use crate::evaluation::{Environment, Evaluator};
+use crate::parsing::Ident;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BuiltInFunc {
@@ -20,18 +21,14 @@ pub enum BuiltInFunc {
     Pow,
 }
 
-impl std::fmt::Display for BuiltInFunc {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "<builtin-{:?}>", self)
-    }
-}
+
 
 fn eval_comparison(
     name: &BuiltInFunc,
     env: &ValueEnvironment,
 ) -> Result<(Value, ValueEnvironment), EvalError> {
-    let x = env.get(&"lhs".into()).unwrap();
-    let y = env.get(&"rhs".into()).unwrap();
+    let x = env.get(&Ident::name("lhs")).unwrap();
+    let y = env.get(&Ident::name("rhs")).unwrap();
 
     match (name, x, y) {
         (BuiltInFunc::Eq, Value::Int32(x), Value::Int32(y)) => env.pure((x == y).into()),
@@ -61,8 +58,8 @@ fn eval_comparison(
 }
 
 fn eval_concat(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
-    let x: String = env.get(&"lhs".into()).unwrap().clone().try_into()?;
-    let y: String = env.get(&"rhs".into()).unwrap().clone().try_into()?;
+    let x: String = env.get(&Ident::name("lhs")).unwrap().clone().try_into()?;
+    let y: String = env.get(&Ident::name("rhs")).unwrap().clone().try_into()?;
 
     env.pure(format!("{x}{y}").into())
 }
@@ -71,8 +68,8 @@ fn eval_math(
     name: &BuiltInFunc,
     env: &ValueEnvironment,
 ) -> Result<(Value, ValueEnvironment), EvalError> {
-    let x = env.get(&"lhs".into()).unwrap();
-    let y = env.get(&"rhs".into()).unwrap();
+    let x = env.get(&Ident::name("lhs")).unwrap();
+    let y = env.get(&Ident::name("rhs")).unwrap();
 
     match (name, x, y) {
         (BuiltInFunc::Add, Value::Int32(x), Value::Int32(y)) => env.pure((x + y).into()),
@@ -100,7 +97,7 @@ fn eval_math(
 }
 
 fn eval_abs(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
-    let x = env.get(&"x".into()).unwrap();
+    let x = env.get(&Ident::name("x")).unwrap();
 
     match x {
         Value::Int32(x) => env.pure(x.abs().into()),
@@ -113,7 +110,7 @@ fn eval_abs(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalErr
 }
 
 fn eval_sqrt(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
-    let x: &Value = env.get(&"x".into()).unwrap();
+    let x: &Value = env.get(&Ident::name("x")).unwrap();
 
     match x {
         Value::Int32(x) => env.pure((*x as f32).sqrt().into()),
@@ -126,8 +123,8 @@ fn eval_sqrt(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalEr
 }
 
 fn eval_pow(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
-    let x = env.get(&"lhs".into()).unwrap();
-    let y = env.get(&"rhs".into()).unwrap();
+    let x = env.get(&Ident::name("lhs")).unwrap();
+    let y = env.get(&Ident::name("rhs")).unwrap();
 
     match (x, y) {
         (Value::Int32(x), Value::Int32(y)) => env.pure((x.pow(*y as u32)).into()),
