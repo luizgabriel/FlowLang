@@ -2,7 +2,7 @@
 
 [![Rust](https://github.com/luizgabriel/FlowLang/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/luizgabriel/FlowLang/actions/workflows/rust.yml)
 
-[WIP] A statically typed, functional programming language.
+[WIP] A ~statically typed~, functional programming language.
 
 ## Example Syntax:
 
