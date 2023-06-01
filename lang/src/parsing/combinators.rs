@@ -1,7 +1,6 @@
 use std::num::{ParseFloatError, ParseIntError};
 use std::str::FromStr;
 
-use crate::parsing::Bindings;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{
@@ -9,11 +8,11 @@ use nom::character::complete::{
 };
 use nom::combinator::{map, map_res, opt, recognize, value, verify};
 use nom::error::{context, ContextError, FromExternalError};
-use nom::multi::{many0, many0_count, many1, separated_list0, separated_list1};
+use nom::multi::{many0_count, many1, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple};
 use nom::{AsChar, Compare, IResult, InputLength, InputTake, InputTakeAtPosition};
 
-use crate::parsing::data::{Declaration, Expr, Ident, ParamsList, Program, Statement};
+use crate::parsing::data::{Expr, Ident, ParamsList, Program, Statement};
 use crate::parsing::error::FwError;
 use crate::parsing::string::parse_string;
 
@@ -268,7 +267,7 @@ where
 
 // Constant Definition
 // ident = Expr
-fn const_def<'a, E>(input: &'a str) -> IResult<&'a str, Declaration, E>
+fn const_def<'a, E>(input: &'a str) -> IResult<&'a str, Statement, E>
 where
     E: FwError<&'a str>,
 {
@@ -276,7 +275,7 @@ where
         "constant variable definition",
         map(
             tuple((ws0(identifier), ws0(tag("=")), expr)),
-            |(name, _, expr)| Declaration::constant(name, expr),
+            |(name, _, expr)| Statement::constant(name, expr),
         ),
     )(input)
 }
@@ -284,7 +283,7 @@ where
 // Function Definition
 // ident arg1 arg2 ... argN = Expr
 // (operator) arg1 arg2 ... argnN = Expr
-fn func_def<'a, E>(input: &'a str) -> IResult<&'a str, Declaration, E>
+fn func_def<'a, E>(input: &'a str) -> IResult<&'a str, Statement, E>
 where
     E: FwError<&'a str>,
 {
@@ -297,32 +296,27 @@ where
                 ws0(tag("=")),
                 statement,
             )),
-            |(name, args, _, body)| Declaration::function(name, args, body),
+            |(name, args, _, body)| Statement::function(name, args, body),
         ),
     )(input)
-}
-
-fn declaration<'a, E>(input: &'a str) -> IResult<&'a str, Declaration, E>
-where
-    E: FwError<&'a str>,
-{
-    context("declaration", alt((const_def, func_def)))(input)
 }
 
 fn let_block<'a, E>(input: &'a str) -> IResult<&'a str, Statement, E>
 where
     E: FwError<&'a str>,
 {
+    let statement_separator = alt((line_ending, ws0(tag(","))));
+
     context(
         "statement let block",
         map(
             tuple((
                 terminated(ws0(tag("let")), multispace0),
-                separated_list1(ws0(many0(line_ending)), declaration),
+                separated_list1(statement_separator, statement),
                 delimited(multispace0, tag("then"), multispace0),
                 expr,
             )),
-            |(_, bindings, _, body)| Statement::block(Bindings::new(bindings), body),
+            |(_, statements, _, body)| Statement::block(statements, body),
         ),
     )(input)
 }
@@ -335,11 +329,7 @@ where
         "statement",
         preceded(
             multispace0,
-            alt((
-                let_block,
-                map(declaration, Statement::declaration),
-                map(expr, Statement::expr),
-            )),
+            alt((let_block, const_def, func_def, map(expr, Statement::expr))),
         ),
     )(input)
 }

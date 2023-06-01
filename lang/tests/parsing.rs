@@ -1,4 +1,4 @@
-use lang::parsing::{Bindings, Declaration, Expr, Ident, ParamsList, Statement};
+use lang::parsing::{Expr, Ident, ParamsList, Statement};
 
 macro_rules! assert_parse_expr {
     ($input:expr, $expected:expr) => {
@@ -90,48 +90,50 @@ fn test_let_block() {
     assert_parse_statement!(
         "let x = 2 then x",
         Statement::block(
-            Bindings::new(vec![Declaration::constant(
-                Ident::name("x"),
-                Expr::Int32(2)
-            ),]),
+            vec![
+                Statement::constant(
+                    Ident::name("x"),
+                    Expr::Int32(2)
+                ),
+            ],
             Expr::name("x")
         )
     );
     assert_parse_statement!(
         "let x = 3\n\ty = 4 then x + y",
         Statement::block(
-            Bindings::new(vec![
-                Declaration::constant(Ident::name("x"), Expr::Int32(3)),
-                Declaration::constant(Ident::name("y"), 4.into()),
-            ]),
+            vec![
+                Statement::constant(Ident::name("x"), Expr::Int32(3)),
+                Statement::constant(Ident::name("y"), Expr::Int32(4)),
+            ],
             Expr::fnapp2(Expr::operator("+"), Expr::name("x"), Expr::name("y"))
         )
     );
     assert_parse_statement!(
         "let x = 5\n\ty = 6\n\tthen\n\tx + y",
         Statement::block(
-            Bindings::new(vec![
-                Declaration::constant(Ident::name("x"), 5.into()),
-                Declaration::constant(Ident::name("y"), 6.into()),
-            ]),
+            vec![
+                Statement::constant(Ident::name("x"), Expr::Int32(5)),
+                Statement::constant(Ident::name("y"), Expr::Int32(6)),
+            ],
             Expr::fnapp2(Expr::operator("+"), Expr::name("x"), Expr::name("y"))
         )
     );
     assert_parse_statement!(
         "let add5 x = 5 + x\ntimes2 x = 2 * x\n\tthen\n\tadd5 >> times2",
         Statement::block(
-            Bindings::new(vec![
-                Declaration::function(
+            vec![
+                Statement::function(
                     Ident::name("add5"),
                     ParamsList::new(vec![Ident::name("x")]),
-                    Expr::fnapp2(Expr::operator("+"), 5.into(), Expr::name("x")).into()
+                    Expr::fnapp2(Expr::operator("+"), Expr::Int32(5), Expr::name("x")).into()
                 ),
-                Declaration::function(
+                Statement::function(
                     Ident::name("times2"),
                     ParamsList::new(vec![Ident::name("x")]),
                     Expr::fnapp2(Expr::operator("*"), Expr::Int32(2), Expr::name("x")).into()
                 ),
-            ]),
+            ],
             Expr::fnapp2(
                 Expr::operator(">>"),
                 Expr::name("add5"),
@@ -145,27 +147,25 @@ fn test_let_block() {
 fn test_func_decl() {
     assert_parse_statement!(
         "add1 x y = x + y",
-        Statement::declaration(Declaration::Function {
-            name: Ident::name("add1"),
-            params: ParamsList::new(vec![Ident::name("x"), Ident::name("y")]),
-            body: Box::new(
-                Expr::fnapp2(Expr::operator("+"), Expr::name("x"), Expr::name("y")).into()
-            ),
-        })
+        Statement::function(
+            Ident::name("add1"),
+            ParamsList::new(vec![Ident::name("x"), Ident::name("y")]),
+            Expr::fnapp2(Expr::operator("+"), Expr::name("x"), Expr::name("y")).into()
+        )
     );
 
     assert_parse_statement!(
         "add2 x y = \nlet k = x \n g = y \n then k + g",
-        Statement::declaration(Declaration::Function {
-            name: Ident::name("add2"),
-            params: ParamsList::new(vec![Ident::name("x"), Ident::name("y")]),
-            body: Box::new(Statement::block(
-                Bindings::new(vec![
-                    Declaration::constant(Ident::name("k"), Expr::name("x")),
-                    Declaration::constant(Ident::name("g"), Expr::name("y")),
-                ]),
+        Statement::function(
+            Ident::name("add2"),
+            ParamsList::new(vec![Ident::name("x"), Ident::name("y")]),
+            Statement::block(
+                vec![
+                    Statement::constant(Ident::name("k"), Expr::name("x")),
+                    Statement::constant(Ident::name("g"), Expr::name("y")),
+                ],
                 Expr::fnapp2(Expr::operator("+"), Expr::name("k"), Expr::name("g"))
-            )),
-        })
+            ),
+        )
     );
 }

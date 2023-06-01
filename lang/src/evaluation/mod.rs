@@ -4,7 +4,7 @@ pub use crate::evaluation::data::Value;
 use crate::evaluation::env::Environment;
 pub use crate::evaluation::env::ValueEnvironment;
 pub use crate::evaluation::error::EvalError;
-use crate::parsing::data::{Declaration, Statement};
+use crate::parsing::data::Statement;
 pub use crate::parsing::data::{Expr, Ident, Program};
 
 mod builtin;
@@ -17,14 +17,15 @@ pub trait Evaluator {
     fn eval(&self, env: ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError>;
 }
 
-impl Evaluator for Declaration {
+impl Evaluator for Statement {
     fn eval(&self, env: ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
         match self {
-            Declaration::Constant { name, expr } => {
+            Statement::Expression(expr) => expr.eval(env),
+            Statement::ConstantDeclaration { name, expr } => {
                 let (value, env) = expr.eval(env)?;
                 Ok((Value::Unit, env.set(name.clone(), value)))
             }
-            Declaration::Function { name, params, body } => {
+            Statement::FunctionDeclaration { name, params, body } => {
                 let scope = Rc::new(RefCell::new(env.clone()));
 
                 let function = Value::Function {
@@ -38,18 +39,9 @@ impl Evaluator for Declaration {
 
                 Ok((Value::Unit, new_env.clone()))
             }
-        }
-    }
-}
-
-impl Evaluator for Statement {
-    fn eval(&self, env: ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
-        match self {
-            Statement::Expression(expr) => expr.eval(env),
-            Statement::Declaration(decl) => decl.eval(env),
-            Statement::LetBlock { bindings, body } => {
+            Statement::Block { statements, body } => {
                 let initial_env = env.clone();
-                let (_, env) = bindings
+                let (_, env) = statements
                     .iter()
                     .try_fold((Value::Unit, env), |(_, env), statement| {
                         statement.eval(env)
@@ -81,7 +73,7 @@ impl Evaluator for Expr {
             Expr::Lambda { params, body } => {
                 let function = Value::Function {
                     params: params.clone(),
-                    body: Box::new(Statement::Expression(body.clone())),
+                    body: body.clone().into(),
                     scope: Rc::new(env.clone().into()),
                 };
 
@@ -108,7 +100,7 @@ impl Evaluator for Expr {
 
                         env.pure(Value::BuiltInFunction {
                             name,
-                            params: rest.iter().cloned().collect(),
+                            params: rest,
                             scope,
                         })
                     }

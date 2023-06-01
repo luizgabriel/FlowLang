@@ -1,5 +1,3 @@
-use std::ops::Index;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ident {
     Name(String),
@@ -83,106 +81,42 @@ pub enum Expr {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Declaration {
-    Constant {
+pub enum Statement {
+    Expression(Expr),
+    ConstantDeclaration {
         name: Ident,
-        expr: Box<Expr>,
+        expr: Expr,
     },
-    Function {
+    FunctionDeclaration {
         name: Ident,
         params: ParamsList,
         body: Box<Statement>,
     },
+    Block {
+        statements: Vec<Statement>,
+        body: Expr,
+    },
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Bindings {
-    bindings: Vec<Declaration>,
-}
-
-impl Bindings {
-    pub fn new(bindings: Vec<Declaration>) -> Self {
-        Bindings { bindings }
+impl Statement {
+    pub fn expr(expr: Expr) -> Self {
+        Statement::Expression(expr)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &Declaration> {
-        self.bindings.iter()
+    pub fn constant(name: Ident, expr: Expr) -> Self {
+        Statement::ConstantDeclaration { name, expr }
     }
 
-    pub fn len(&self) -> usize {
-        self.bindings.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.bindings.is_empty()
-    }
-
-    pub fn get(&self, index: usize) -> Option<&Declaration> {
-        self.bindings.get(index)
-    }
-}
-
-impl Index<usize> for Bindings {
-    type Output = Declaration;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.bindings[index]
-    }
-}
-
-impl IntoIterator for Bindings {
-    type Item = Declaration;
-    type IntoIter = <Vec<Declaration> as IntoIterator>::IntoIter;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.bindings.into_iter()
-    }
-}
-
-impl FromIterator<Declaration> for Bindings {
-    fn from_iter<T: IntoIterator<Item = Declaration>>(iter: T) -> Self {
-        Bindings::new(iter.into_iter().collect())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Statement {
-    Expression(Box<Expr>),
-    Declaration(Box<Declaration>),
-    LetBlock { bindings: Bindings, body: Box<Expr> },
-}
-
-impl Declaration {
-    pub fn constant(name: Ident, expr: Expr) -> Declaration {
-        Declaration::Constant {
-            name,
-            expr: Box::new(expr),
-        }
-    }
-
-    pub fn function(name: Ident, params: ParamsList, body: Statement) -> Declaration {
-        Declaration::Function {
+    pub fn function(name: Ident, params: ParamsList, body: Statement) -> Self {
+        Statement::FunctionDeclaration {
             name,
             params,
             body: Box::new(body),
         }
     }
-}
 
-impl Statement {
-    pub fn expr(expr: Expr) -> Statement {
-        Statement::Expression(Box::new(expr))
-    }
-
-    pub fn declaration(decl: Declaration) -> Statement {
-        Statement::Declaration(Box::new(decl))
-    }
-
-    pub fn block(bindings: Bindings, body: Expr) -> Statement {
-        Statement::LetBlock {
-            bindings,
-            body: Box::new(body),
-        }
+    pub fn block(statements: Vec<Statement>, body: Expr) -> Self {
+        Statement::Block { statements, body }
     }
 }
 
@@ -267,5 +201,11 @@ impl_from_for_expr!(String, String);
 impl From<Expr> for Statement {
     fn from(expr: Expr) -> Self {
         Statement::expr(expr)
+    }
+}
+
+impl From<Box<Expr>> for Box<Statement> {
+    fn from(expr: Box<Expr>) -> Self {
+        Box::new(Statement::expr(*expr))
     }
 }

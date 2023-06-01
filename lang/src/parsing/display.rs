@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter, Result};
 
-use crate::parsing::data::{Declaration, ParamsList, Statement};
-use crate::parsing::{Bindings, Expr, Ident};
+use crate::parsing::data::{ParamsList, Statement};
+use crate::parsing::{Expr, Ident};
 
 impl Display for Ident {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
@@ -38,12 +38,7 @@ impl Display for Expr {
                 Expr::FunctionApplication(_, _) => write!(f, "{} ({})", lhs, rhs),
                 _ => write!(f, "{} {}", lhs, rhs),
             },
-            Expr::Lambda { params, body } => write!(
-                f,
-                "({} -> {})",
-                params,
-                body
-            ),
+            Expr::Lambda { params, body } => write!(f, "({} -> {})", params, body),
             Expr::If {
                 condition,
                 then,
@@ -53,47 +48,31 @@ impl Display for Expr {
     }
 }
 
-impl Display for Bindings {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.len() == 1 {
-            return write!(f, "{}", self[0]);
-        }
-
-        write!(f, "\t{}", self
-            .iter()
-            .map(|decl| decl.to_string())
-            .collect::<Vec<String>>()
-            .join("\n\t"))
-    }
-}
-
 impl Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Statement::Expression(e) => write!(f, "{}", e),
-            Statement::Declaration(decl) => write!(f, "{}", decl),
-            Statement::LetBlock {
-                bindings,
-                body,
-            } => {
-                if bindings.len() == 1 {
-                    return write!(f, "let {} then {}", bindings, body);
-                }
-
-                write!(f, "let\n{}\n\n\tthen\n\t{}", bindings, *body.clone())
+            Statement::ConstantDeclaration { name, expr: value } => {
+                write!(f, "{} = {}", name, value)
             }
-        }
-    }
-}
-
-impl Display for Declaration {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self {
-            Declaration::Constant { name, expr: value } => write!(f, "{} = {}", name, value),
-            Declaration::Function { name, params, body } => {
+            Statement::FunctionDeclaration { name, params, body } => {
                 write!(f, "{} {} = {}", name, params, body)
             }
+            Statement::Block { statements, body } => {
+                if statements.len() == 1 {
+                    return write!(f, "let {} then {}", statements[0], body);
+                }
+                write!(
+                    f,
+                    "let\n{}\n\n\tthen\n\t{}",
+                    statements
+                        .iter()
+                        .map(|decl| decl.to_string())
+                        .collect::<Vec<String>>()
+                        .join("\n\t"),
+                    body.clone()
+                )
+            }
         }
     }
 }
-
