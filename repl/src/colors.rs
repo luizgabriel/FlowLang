@@ -1,7 +1,7 @@
 use colored::Colorize;
 use lang::evaluation::Value;
 use lang::parsing::{Expr, Ident, ParamsList, Program, Statement};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Formatter, Result};
 
 pub struct Colored<T> {
     value: T,
@@ -14,7 +14,7 @@ impl<T> Colored<T> {
 }
 
 impl Display for Colored<Expr> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match &self.value {
             Expr::Unit => write!(f, "{}", "()".white()),
             Expr::Int32(value) => write!(f, "{}", value.to_string().bright_blue()),
@@ -61,7 +61,7 @@ impl Display for Colored<Expr> {
 }
 
 impl Display for Colored<Statement> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match &self.value {
             Statement::Expression(expr) => write!(f, "{}", Colored::new(expr.clone())),
             Statement::FunctionDeclaration { name, params, body } => write!(
@@ -103,7 +103,7 @@ impl Display for Colored<Statement> {
 }
 
 impl Display for Colored<ParamsList> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(
             f,
             "{}",
@@ -118,7 +118,7 @@ impl Display for Colored<ParamsList> {
 }
 
 impl Display for Colored<Value> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match &self.value {
             Value::Unit => write!(f, "{}", "()".white()),
             Value::Bool(value) => write!(f, "{}", value.to_string().red()),
@@ -150,7 +150,7 @@ impl Display for Colored<Value> {
 }
 
 impl Display for Colored<Program> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(
             f,
             "{}",

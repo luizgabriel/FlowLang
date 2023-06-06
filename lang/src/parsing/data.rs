@@ -35,7 +35,7 @@ impl ParamsList {
         self.params.get(index)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &Ident> {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &Ident> {
         self.params.iter()
     }
 

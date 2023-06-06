@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 pub use crate::evaluation::data::Value;
-use crate::evaluation::env::Environment;
+use crate::Environment;
 pub use crate::evaluation::env::ValueEnvironment;
 pub use crate::evaluation::error::EvalError;
 use crate::parsing::data::Statement;

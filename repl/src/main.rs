@@ -12,7 +12,7 @@ use lang::parsing::parse_program;
 const HISTORY_PATH: &str = ".flow_history";
 
 fn read_parse_eval(state: &mut REPLState) -> Result<Value, REPLError> {
-    let input = state.rl.readline(&"flow> ").map_err(REPLError::from)?;
+    let input = state.rl.readline("flow> ").map_err(REPLError::from)?;
 
     let expr = parse_program(&input).map_err(REPLError::from)?;
 
