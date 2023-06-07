@@ -155,7 +155,7 @@ fn test_func_decl() {
     );
 
     assert_parse_statement!(
-        "add2 x y = \nlet k = x \n g = y \n then k + g",
+        "add2 x y = \nlet k = x, g = y \n then k + g",
         Statement::function(
             Ident::name("add2"),
             ParamsList::new(vec![Ident::name("x"), Ident::name("y")]),
