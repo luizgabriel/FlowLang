@@ -1,14 +1,14 @@
-use std::borrow::Cow;
-use std::borrow::Cow::{Owned};
 use colored::Colorize;
-use rustyline::{Context, Editor, Helper};
-use rustyline::completion::Completer;
-use rustyline::highlight::Highlighter;
-use rustyline::hint::{Hinter};
-use rustyline::history::DefaultHistory;
-use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use lang::evaluation::ValueEnvironment;
 use lang::parsing::{parse_program, ParseError};
+use rustyline::completion::Completer;
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::history::DefaultHistory;
+use rustyline::validate::{ValidationContext, ValidationResult, Validator};
+use rustyline::{Context, Editor, Helper};
+use std::borrow::Cow;
+use std::borrow::Cow::Owned;
 
 #[derive(Default)]
 pub struct REPLHelper();
@@ -19,12 +19,10 @@ impl Validator for REPLHelper {
 
         match result {
             Ok(_) => Ok(ValidationResult::Valid(None)),
-            Err(e) => {
-                match e {
-                    ParseError::NotFullyParsed(_) => Ok(ValidationResult::Incomplete),
-                    ParseError::Failed(e) => Ok(ValidationResult::Invalid(Some(e))),
-                }
-            }
+            Err(e) => match e {
+                ParseError::NotFullyParsed(_) => Ok(ValidationResult::Incomplete),
+                ParseError::Failed(e) => Ok(ValidationResult::Invalid(Some(e))),
+            },
         }
     }
 }
@@ -81,7 +79,7 @@ impl REPLState {
         let mut rl = Editor::with_config(config).unwrap();
         rl.set_helper(Some(REPLHelper::default()));
 
-        let env = ValueEnvironment::default();
+        let env = ValueEnvironment::default().import_std();
 
         Self { rl, env }
     }
