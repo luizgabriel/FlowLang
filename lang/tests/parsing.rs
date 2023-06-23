@@ -89,30 +89,30 @@ fn test_if_expr() {
 fn test_let_block() {
     assert_parse_statement!(
         "{ x = 2; x }",
-        Statement::block(vec![
+        Statement::Block(vec![
             Statement::constant(Ident::name("x"), Expr::Int32(2)),
             Expr::name("x").into(),
-        ],)
+        ])
     );
     assert_parse_statement!(
         "{ x = 3;\n\ty = 4; x + y }",
-        Statement::block(vec![
+        Statement::Block(vec![
             Statement::constant(Ident::name("x"), Expr::Int32(3)),
             Statement::constant(Ident::name("y"), Expr::Int32(4)),
             Expr::fnapp2(Expr::operator("+"), Expr::name("x"), Expr::name("y")).into(),
-        ],)
+        ])
     );
     assert_parse_statement!(
         "{ x = 5;\n\ty = 6; \n\tx + y }",
-        Statement::block(vec![
+        Statement::Block(vec![
             Statement::constant(Ident::name("x"), Expr::Int32(5)),
             Statement::constant(Ident::name("y"), Expr::Int32(6)),
             Expr::fnapp2(Expr::operator("+"), Expr::name("x"), Expr::name("y")).into(),
-        ],)
+        ])
     );
     assert_parse_statement!(
         "{ add5 x = 5 + x; \ntimes2 x = 2 * x;\n\tadd5 >> times2 }",
-        Statement::block(vec![
+        Statement::Block(vec![
             Statement::function(
                 Ident::name("add5"),
                 ParamsList::new(vec![Ident::name("x")]),
@@ -129,7 +129,7 @@ fn test_let_block() {
                 Expr::name("times2")
             )
             .into(),
-        ],)
+        ])
     );
 }
 
@@ -149,11 +149,11 @@ fn test_func_decl() {
         Statement::function(
             Ident::name("add2"),
             ParamsList::new(vec![Ident::name("x"), Ident::name("y")]),
-            Statement::block(vec![
+            Statement::Block(vec![
                 Statement::constant(Ident::name("k"), Expr::name("x")),
                 Statement::constant(Ident::name("g"), Expr::name("y")),
                 Expr::fnapp2(Expr::operator("+"), Expr::name("k"), Expr::name("g")).into()
-            ],),
+            ]),
         )
     );
 }
