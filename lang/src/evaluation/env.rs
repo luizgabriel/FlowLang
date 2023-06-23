@@ -1,5 +1,5 @@
-use rpds::HashTrieMap;
 use crate::Environment;
+use rpds::HashTrieMap;
 
 use crate::evaluation::builtin::BuiltInFunc;
 use crate::evaluation::data::Value;

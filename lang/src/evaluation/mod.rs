@@ -1,11 +1,11 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, sync::Arc};
 
 pub use crate::evaluation::data::Value;
-use crate::Environment;
 pub use crate::evaluation::env::ValueEnvironment;
 pub use crate::evaluation::error::EvalError;
 use crate::parsing::data::Statement;
 pub use crate::parsing::data::{Expr, Ident, Program};
+use crate::Environment;
 
 mod builtin;
 pub mod data;
@@ -26,7 +26,7 @@ impl Evaluator for Statement {
                 Ok((Value::Unit, env.set(name.clone(), value)))
             }
             Statement::FunctionDeclaration { name, params, body } => {
-                let scope = Rc::new(RefCell::new(env.clone()));
+                let scope = Arc::new(RefCell::new(env.clone()));
 
                 let function = Value::Function {
                     params: params.clone(),
@@ -35,19 +35,18 @@ impl Evaluator for Statement {
                 };
 
                 scope.replace(env.set(name.clone(), function));
-                let new_env = scope.borrow();
 
+                let new_env = scope.borrow();
                 Ok((Value::Unit, new_env.clone()))
             }
-            Statement::Block { statements, body } => {
-                let initial_env = env.clone();
-                let (_, env) = statements
+            Statement::Block { statements } => {
+                let (last_value, _) = statements
                     .iter()
-                    .try_fold((Value::Unit, env), |(_, env), statement| {
+                    .try_fold((Value::Unit, env.clone()), |(_, env), statement| {
                         statement.eval(env)
                     })?;
-                let (value, _) = body.eval(env)?;
-                Ok((value, initial_env))
+
+                Ok((last_value, env))
             }
         }
     }
@@ -74,7 +73,7 @@ impl Evaluator for Expr {
                 let function = Value::Function {
                     params: params.clone(),
                     body: body.clone().into(),
-                    scope: Rc::new(env.clone().into()),
+                    scope: Arc::new(env.clone().into()),
                 };
 
                 env.pure(function)
@@ -121,7 +120,7 @@ impl Evaluator for Expr {
                         env.pure(Value::Function {
                             params: rest,
                             body,
-                            scope: Rc::new(scope.into()),
+                            scope: Arc::new(scope.into()),
                         })
                     }
 

@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::evaluation::builtin::BuiltInFunc;
 use crate::evaluation::env::ValueEnvironment;
@@ -16,7 +16,7 @@ pub enum Value {
     Function {
         params: ParamsList,
         body: Box<Statement>,
-        scope: Rc<RefCell<ValueEnvironment>>,
+        scope: Arc<RefCell<ValueEnvironment>>,
     },
     BuiltInFunction {
         name: BuiltInFunc,

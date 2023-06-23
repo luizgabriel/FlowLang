@@ -4,12 +4,12 @@ use std::str::FromStr;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{
-    alpha1, alphanumeric1, digit1, line_ending, multispace0, multispace1, one_of, space0,
+    alpha1, alphanumeric1, digit1, multispace0, multispace1, one_of, space0,
 };
 use nom::combinator::{map, map_res, opt, recognize, value, verify};
 use nom::error::{context, ContextError, FromExternalError};
 use nom::multi::{many0_count, many1, separated_list0, separated_list1};
-use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple};
+use nom::sequence::{delimited, pair, preceded, separated_pair, tuple};
 use nom::{AsChar, Compare, IResult, InputLength, InputTake, InputTakeAtPosition};
 
 use crate::parsing::data::{Expr, Ident, ParamsList, Program, Statement};
@@ -305,18 +305,15 @@ fn let_block<'a, E>(input: &'a str) -> IResult<&'a str, Statement, E>
 where
     E: FwError<&'a str>,
 {
-    let statement_separator = alt((line_ending, ws0(tag(","))));
-
     context(
         "statement let block",
         map(
-            tuple((
-                terminated(ws0(tag("let")), multispace0),
-                separated_list1(statement_separator, statement),
-                delimited(multispace0, tag("then"), multispace0),
-                expr,
-            )),
-            |(_, statements, _, body)| Statement::block(statements, body),
+            delimited(
+                tag("{"),
+                separated_list1(tag(";"), statement),
+                preceded(multispace0, tag("}")),
+            ),
+            Statement::block,
         ),
     )(input)
 }

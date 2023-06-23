@@ -58,21 +58,15 @@ impl Display for Statement {
             Statement::FunctionDeclaration { name, params, body } => {
                 write!(f, "{} {} = {}", name, params, body)
             }
-            Statement::Block { statements, body } => {
-                if statements.len() == 1 {
-                    return write!(f, "let {} then {}", statements[0], body);
-                }
-                write!(
-                    f,
-                    "let\n{}\n\n\tthen\n\t{}",
-                    statements
-                        .iter()
-                        .map(|decl| decl.to_string())
-                        .collect::<Vec<String>>()
-                        .join("\n\t"),
-                    body.clone()
-                )
-            }
+            Statement::Block { statements } => write!(
+                f,
+                "{{\n\t{}\n\t}}",
+                statements
+                    .iter()
+                    .map(|decl| decl.to_string())
+                    .collect::<Vec<String>>()
+                    .join(";\n\t\t"),
+            ),
         }
     }
 }

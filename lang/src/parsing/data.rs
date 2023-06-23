@@ -94,7 +94,6 @@ pub enum Statement {
     },
     Block {
         statements: Vec<Statement>,
-        body: Expr,
     },
 }
 
@@ -115,8 +114,8 @@ impl Statement {
         }
     }
 
-    pub fn block(statements: Vec<Statement>, body: Expr) -> Self {
-        Statement::Block { statements, body }
+    pub fn block(statements: Vec<Statement>) -> Self {
+        Statement::Block { statements }
     }
 }
 

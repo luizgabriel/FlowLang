@@ -77,25 +77,15 @@ impl Display for Colored<Statement> {
                 name.to_string().white(),
                 Colored::new(expr.clone())
             ),
-            Statement::Block { statements, body } => {
-                if statements.len() == 1 {
-                    return write!(
-                        f,
-                        "let {} then {}",
-                        Colored::new(statements[0].clone()),
-                        Colored::new(body.clone())
-                    );
-                }
-
+            Statement::Block { statements } => {
                 write!(
                     f,
-                    "let\n{}\n\n\tthen\n\t{}",
+                    "{{\n\t{}\n\t}}",
                     statements
                         .iter()
                         .map(|s| Colored::new(s.clone()).to_string())
                         .collect::<Vec<String>>()
-                        .join("\n\t"),
-                    Colored::new(body.clone())
+                        .join(";\n\t\t"),
                 )
             }
         }
