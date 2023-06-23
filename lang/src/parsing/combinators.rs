@@ -324,7 +324,7 @@ where
 {
     context(
         "module name",
-        map(separated_list1(tag("."), identifier), ModuleName::new),
+        map(separated_list1(tag("::"), identifier), ModuleName::new),
     )(input)
 }
 

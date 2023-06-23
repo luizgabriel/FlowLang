@@ -50,6 +50,16 @@ add1 = x -> x + 1
 add1 5
 ```
 
+### Import Modules
+
+Loads module from `./examples/math.fw`
+
+```hs
+use examples::math
+
+eq_root1 1.0 3.0 2.0
+```
+
 ## Getting Started
 
 Install the **Rust** programming language:

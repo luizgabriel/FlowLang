@@ -58,7 +58,7 @@ impl Display for ModuleName {
             self.iter()
                 .map(|p| p.to_string())
                 .collect::<Vec<String>>()
-                .join(".")
+                .join("::")
         )
     }
 }
