@@ -3,6 +3,8 @@ use std::fmt::{Display, Formatter, Result};
 use crate::parsing::data::{ParamsList, Statement};
 use crate::parsing::{Expr, Ident};
 
+use super::data::ModuleName;
+
 impl Display for Ident {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         match self {
@@ -48,9 +50,23 @@ impl Display for Expr {
     }
 }
 
+impl Display for ModuleName {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(
+            f,
+            "{}",
+            self.iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<String>>()
+                .join(".")
+        )
+    }
+}
+
 impl Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
+            Statement::UseModule(module) => write!(f, "use {}", module),
             Statement::Expression(e) => write!(f, "{}", e),
             Statement::ConstantDeclaration { name, expr: value } => {
                 write!(f, "{} = {}", name, value)
@@ -58,7 +74,7 @@ impl Display for Statement {
             Statement::FunctionDeclaration { name, params, body } => {
                 write!(f, "{} {} = {}", name, params, body)
             }
-            Statement::Block { statements } => write!(
+            Statement::Block(statements) => write!(
                 f,
                 "{{\n\t{}\n\t}}",
                 statements

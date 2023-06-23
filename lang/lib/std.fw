@@ -1,0 +1,8 @@
+equalUpTo epsilon x y = abs (x - y) < epsilon
+
+max x y = if x > y then x else y
+min x y = if x < y then x else y
+
+(|>) a f = f a
+(>>) f g = x -> g (f x)
+(<<) f g = x -> f (g x)

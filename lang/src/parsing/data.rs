@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ident {
     Name(String),
@@ -8,8 +10,16 @@ impl Ident {
     pub fn name(name: &str) -> Self {
         Ident::Name(name.to_string())
     }
+
     pub fn op(op: &str) -> Self {
         Ident::Operator(op.to_string())
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Ident::Name(name) => name,
+            Ident::Operator(op) => op,
+        }
     }
 }
 
@@ -81,7 +91,37 @@ pub enum Expr {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct ModuleName(Vec<Ident>);
+
+impl ModuleName {
+    pub fn new(names: Vec<Ident>) -> Self {
+        ModuleName(names)
+    }
+
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &Ident> {
+        self.0.iter()
+    }
+
+    pub fn as_path(&self) -> PathBuf {
+        self.iter()
+            .map(|ident| ident.to_string())
+            .collect::<PathBuf>()
+            .with_extension("fw")
+    }
+}
+
+impl IntoIterator for ModuleName {
+    type Item = Ident;
+    type IntoIter = <Vec<Ident> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
+    UseModule(ModuleName),
     Expression(Expr),
     ConstantDeclaration {
         name: Ident,
@@ -92,9 +132,7 @@ pub enum Statement {
         params: ParamsList,
         body: Box<Statement>,
     },
-    Block {
-        statements: Vec<Statement>,
-    },
+    Block(Vec<Statement>),
 }
 
 impl Statement {
@@ -112,10 +150,6 @@ impl Statement {
             params,
             body: Box::new(body),
         }
-    }
-
-    pub fn block(statements: Vec<Statement>) -> Self {
-        Statement::Block { statements }
     }
 }
 

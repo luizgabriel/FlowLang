@@ -12,7 +12,7 @@ use nom::multi::{many0_count, many1, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded, separated_pair, tuple};
 use nom::{AsChar, Compare, IResult, InputLength, InputTake, InputTakeAtPosition};
 
-use crate::parsing::data::{Expr, Ident, ParamsList, Program, Statement};
+use crate::parsing::data::{Expr, Ident, ModuleName, ParamsList, Program, Statement};
 use crate::parsing::error::FwError;
 use crate::parsing::string::parse_string;
 
@@ -65,7 +65,7 @@ where
     ));
 
     //Dont allow these keywords
-    const KEYWORDS: [&str; 4] = ["let", "if", "then", "else"];
+    const KEYWORDS: [&str; 4] = ["if", "then", "else", "use"];
     let identifier_except_keywords = blacklist(identifier, &KEYWORDS);
 
     context(
@@ -313,7 +313,30 @@ where
                 separated_list1(tag(";"), statement),
                 preceded(multispace0, tag("}")),
             ),
-            Statement::block,
+            Statement::Block,
+        ),
+    )(input)
+}
+
+fn module_name<'a, E>(input: &'a str) -> IResult<&'a str, ModuleName, E>
+where
+    E: FwError<&'a str>,
+{
+    context(
+        "module name",
+        map(separated_list1(tag("."), identifier), ModuleName::new),
+    )(input)
+}
+
+fn use_module<'a, E>(input: &'a str) -> IResult<&'a str, Statement, E>
+where
+    E: FwError<&'a str>,
+{
+    context(
+        "import",
+        map(
+            preceded(ws0(tag("use")), ws0(module_name)),
+            Statement::UseModule,
         ),
     )(input)
 }
@@ -326,7 +349,13 @@ where
         "statement",
         preceded(
             multispace0,
-            alt((let_block, const_def, func_def, map(expr, Statement::expr))),
+            alt((
+                use_module,
+                let_block,
+                const_def,
+                func_def,
+                map(expr, Statement::expr),
+            )),
         ),
     )(input)
 }

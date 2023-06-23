@@ -1,10 +1,12 @@
+use std::borrow::Cow;
 use std::{cell::RefCell, sync::Arc};
 
 pub use crate::evaluation::data::Value;
 pub use crate::evaluation::env::ValueEnvironment;
 pub use crate::evaluation::error::EvalError;
-use crate::parsing::data::Statement;
 pub use crate::parsing::data::{Expr, Ident, Program};
+use crate::parsing::data::{ModuleName, Statement};
+use crate::parsing::parse_program;
 use crate::Environment;
 
 mod builtin;
@@ -17,9 +19,26 @@ pub trait Evaluator {
     fn eval(&self, env: ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError>;
 }
 
+impl Evaluator for ModuleName {
+    fn eval(&self, env: ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
+        let module = match self.to_string().as_str() {
+            "std" => Cow::Borrowed(include_str!("../../lib/std.fw")),
+            _ => match std::fs::read_to_string(self.as_path()) {
+                Ok(content) => Cow::Owned(content),
+                Err(err) => return Err(EvalError::CouldNotReadModule(self.clone(), err)),
+            },
+        };
+
+        parse_program(module.as_ref())
+            .map_err(|e| EvalError::InvalidModule(self.clone(), e))
+            .and_then(|program| program.eval(env))
+    }
+}
+
 impl Evaluator for Statement {
     fn eval(&self, env: ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
         match self {
+            Statement::UseModule(module) => module.eval(env),
             Statement::Expression(expr) => expr.eval(env),
             Statement::ConstantDeclaration { name, expr } => {
                 let (value, env) = expr.eval(env)?;
@@ -39,7 +58,7 @@ impl Evaluator for Statement {
                 let new_env = scope.borrow();
                 Ok((Value::Unit, new_env.clone()))
             }
-            Statement::Block { statements } => {
+            Statement::Block(statements) => {
                 let (last_value, _) = statements
                     .iter()
                     .try_fold((Value::Unit, env.clone()), |(_, env), statement| {

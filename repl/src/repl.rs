@@ -79,7 +79,7 @@ impl REPLState {
         let mut rl = Editor::with_config(config).unwrap();
         rl.set_helper(Some(REPLHelper::default()));
 
-        let env = ValueEnvironment::default().import_std();
+        let env = ValueEnvironment::default().define_builtins();
 
         Self { rl, env }
     }

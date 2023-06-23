@@ -1,5 +1,6 @@
 use colored::Colorize;
 use lang::evaluation::Value;
+use lang::parsing::data::ModuleName;
 use lang::parsing::{Expr, Ident, ParamsList, Program, Statement};
 use std::fmt::{Display, Formatter, Result};
 
@@ -60,9 +61,26 @@ impl Display for Colored<Expr> {
     }
 }
 
+impl Display for Colored<ModuleName> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(
+            f,
+            "{}",
+            self.value
+                .iter()
+                .map(|s| s.to_string().bright_yellow().to_string())
+                .collect::<Vec<_>>()
+                .join(".")
+        )
+    }
+}
+
 impl Display for Colored<Statement> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match &self.value {
+            Statement::UseModule(module_name) => {
+                write!(f, "use {}", Colored::new(module_name.clone()))
+            }
             Statement::Expression(expr) => write!(f, "{}", Colored::new(expr.clone())),
             Statement::FunctionDeclaration { name, params, body } => write!(
                 f,
@@ -77,14 +95,14 @@ impl Display for Colored<Statement> {
                 name.to_string().white(),
                 Colored::new(expr.clone())
             ),
-            Statement::Block { statements } => {
+            Statement::Block(statements) => {
                 write!(
                     f,
                     "{{\n\t{}\n\t}}",
                     statements
                         .iter()
                         .map(|s| Colored::new(s.clone()).to_string())
-                        .collect::<Vec<String>>()
+                        .collect::<Vec<_>>()
                         .join(";\n\t\t"),
                 )
             }
@@ -100,7 +118,7 @@ impl Display for Colored<ParamsList> {
             self.value
                 .iter()
                 .map(|param| param.to_string())
-                .collect::<Vec<String>>()
+                .collect::<Vec<_>>()
                 .join(" ")
                 .yellow()
         )
@@ -147,7 +165,7 @@ impl Display for Colored<Program> {
             self.value
                 .iter()
                 .map(|stmt| Colored::new(stmt.clone()).to_string())
-                .collect::<Vec<String>>()
+                .collect::<Vec<_>>()
                 .join("\n")
         )
     }

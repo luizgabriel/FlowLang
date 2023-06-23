@@ -1,7 +1,5 @@
-use crate::{
-    evaluation::{EvalError, Value, ValueEnvironment},
-};
 use crate::evaluation::{Environment, Evaluator};
+use crate::evaluation::{EvalError, Value, ValueEnvironment};
 use crate::parsing::Ident;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -18,7 +16,8 @@ pub enum BuiltInFunc {
     Abs,
     Sqrt,
     Concat,
-    Pow,
+    PowF,
+    PowI,
 }
 
 fn eval_comparison(
@@ -120,25 +119,36 @@ fn eval_sqrt(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalEr
     }
 }
 
-fn eval_pow(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
+fn eval_powf(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
     let x = env.get(&Ident::name("lhs")).unwrap();
     let y = env.get(&Ident::name("rhs")).unwrap();
 
     match (x, y) {
-        (Value::Int32(x), Value::Int32(y)) => env.pure((x.pow(*y as u32)).into()),
-        (Value::Int32(x), Value::Float32(y)) => env.pure((*x as f32).powf(*y).into()),
         (Value::Float32(x), Value::Float32(y)) => env.pure(x.powf(*y).into()),
-        (Value::Int32(_), y) => Err(EvalError::InvalidType {
-            value: y.clone(),
-            expected: "Int32",
-        }),
         (Value::Float32(_), y) => Err(EvalError::InvalidType {
             value: y.clone(),
             expected: "Float32",
         }),
         (x, _) => Err(EvalError::InvalidType {
             value: x.clone(),
-            expected: "Int32 or Float32",
+            expected: "Float32",
+        }),
+    }
+}
+
+fn eval_powi(env: &ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
+    let x = env.get(&Ident::name("lhs")).unwrap();
+    let y = env.get(&Ident::name("rhs")).unwrap();
+
+    match (x, y) {
+        (Value::Float32(x), Value::Int32(y)) => env.pure((x.powi(*y)).into()),
+        (Value::Float32(_), y) => Err(EvalError::InvalidType {
+            value: y.clone(),
+            expected: "Int32",
+        }),
+        (x, _) => Err(EvalError::InvalidType {
+            value: x.clone(),
+            expected: "Float32",
         }),
     }
 }
@@ -148,7 +158,8 @@ impl Evaluator for BuiltInFunc {
         match self {
             BuiltInFunc::Concat => eval_concat(&env),
             BuiltInFunc::Sqrt => eval_sqrt(&env),
-            BuiltInFunc::Pow => eval_pow(&env),
+            BuiltInFunc::PowF => eval_powf(&env),
+            BuiltInFunc::PowI => eval_powi(&env),
             BuiltInFunc::Eq
             | BuiltInFunc::Gt
             | BuiltInFunc::Lt
