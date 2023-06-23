@@ -78,7 +78,7 @@ impl Display for Colored<ModuleName> {
 impl Display for Colored<Statement> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match &self.value {
-            Statement::UseModule(module_name) => {
+            Statement::Import(module_name) => {
                 write!(f, "use {}", Colored::new(module_name.clone()))
             }
             Statement::Expression(expr) => write!(f, "{}", Colored::new(expr.clone())),

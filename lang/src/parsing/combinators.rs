@@ -65,7 +65,7 @@ where
     ));
 
     //Dont allow these keywords
-    const KEYWORDS: [&str; 4] = ["if", "then", "else", "use"];
+    const KEYWORDS: [&str; 4] = ["if", "then", "else", "import"];
     let identifier_except_keywords = blacklist(identifier, &KEYWORDS);
 
     context(
@@ -328,7 +328,7 @@ where
     )(input)
 }
 
-fn use_module<'a, E>(input: &'a str) -> IResult<&'a str, Statement, E>
+fn import_module<'a, E>(input: &'a str) -> IResult<&'a str, Statement, E>
 where
     E: FwError<&'a str>,
 {
@@ -336,7 +336,7 @@ where
         "import",
         map(
             preceded(ws0(tag("use")), ws0(module_name)),
-            Statement::UseModule,
+            Statement::Import,
         ),
     )(input)
 }
@@ -350,7 +350,7 @@ where
         preceded(
             multispace0,
             alt((
-                use_module,
+                import_module,
                 let_block,
                 const_def,
                 func_def,

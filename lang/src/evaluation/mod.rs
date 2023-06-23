@@ -38,7 +38,7 @@ impl Evaluator for ModuleName {
 impl Evaluator for Statement {
     fn eval(&self, env: ValueEnvironment) -> Result<(Value, ValueEnvironment), EvalError> {
         match self {
-            Statement::UseModule(module) => module.eval(env),
+            Statement::Import(module) => module.eval(env),
             Statement::Expression(expr) => expr.eval(env),
             Statement::ConstantDeclaration { name, expr } => {
                 let (value, env) = expr.eval(env)?;

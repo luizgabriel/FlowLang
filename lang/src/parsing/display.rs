@@ -66,7 +66,7 @@ impl Display for ModuleName {
 impl Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Statement::UseModule(module) => write!(f, "use {}", module),
+            Statement::Import(module) => write!(f, "use {}", module),
             Statement::Expression(e) => write!(f, "{}", e),
             Statement::ConstantDeclaration { name, expr: value } => {
                 write!(f, "{} = {}", name, value)

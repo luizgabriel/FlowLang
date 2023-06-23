@@ -121,7 +121,7 @@ impl IntoIterator for ModuleName {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
-    UseModule(ModuleName),
+    Import(ModuleName),
     Expression(Expr),
     ConstantDeclaration {
         name: Ident,

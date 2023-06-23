@@ -55,7 +55,7 @@ add1 5
 Loads module from `./examples/math.fw`
 
 ```hs
-use examples::math
+import examples::math
 
 eq_root1 1.0 3.0 2.0
 ```
