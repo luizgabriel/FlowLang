@@ -12,7 +12,9 @@ use nom::multi::{many0_count, many1, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded, separated_pair, tuple};
 use nom::{AsChar, Compare, IResult, InputLength, InputTake, InputTakeAtPosition};
 
-use crate::parsing::data::{Expr, Ident, ModuleName, ParamsList, Program, Statement};
+use crate::parsing::data::{
+    Expr, Ident, IdentConstructor, ModuleName, ParamsList, Program, Statement,
+};
 use crate::parsing::error::FwError;
 use crate::parsing::string::parse_string;
 
@@ -70,8 +72,8 @@ where
 
     context(
         "identifier",
-        map(identifier_except_keywords, |ident: &'a str| {
-            Ident::name(ident)
+        map(identifier_except_keywords, |name: &'a str| {
+            Ident::name(name.to_owned())
         }),
     )(input)
 }
@@ -82,7 +84,10 @@ where
 {
     context(
         "operator",
-        map(recognize(many1(one_of("!$%^&*-=+<>.~\\/|:"))), Ident::op),
+        map(
+            recognize(many1(one_of("!$%^&*-=+<>.~\\/|:"))),
+            |operator: &'a str| Ident::op(operator.to_owned()),
+        ),
     )(input)
 }
 
@@ -210,7 +215,7 @@ where
 {
     context(
         "parameter list",
-        map(many1(ws0(identifier)), ParamsList::new),
+        map(many1(ws0(identifier)), ParamsList::from_vec),
     )(input)
 }
 
@@ -313,7 +318,7 @@ where
                 separated_list1(tag(";"), statement),
                 preceded(multispace0, tag("}")),
             ),
-            Statement::Block,
+            |statements| Statement::Block(statements.into()),
         ),
     )(input)
 }
@@ -324,7 +329,7 @@ where
 {
     context(
         "module name",
-        map(separated_list1(tag("::"), identifier), ModuleName::new),
+        map(separated_list1(tag("::"), identifier), ModuleName::from_vec),
     )(input)
 }
 
@@ -335,7 +340,7 @@ where
     context(
         "import",
         map(
-            preceded(ws0(tag("use")), ws0(module_name)),
+            preceded(ws0(tag("import")), ws0(module_name)),
             Statement::Import,
         ),
     )(input)
@@ -370,5 +375,5 @@ where
         multispace0,
     );
 
-    context("module", map(expr_block, Program::new))(input)
+    context("module", map(expr_block, Program::from_vec))(input)
 }

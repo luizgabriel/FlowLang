@@ -8,3 +8,5 @@ eq_root2 a b c = {
     d = eq_delta a b c;
     ((-1.0 * b) - sqrt d) / 2.0 * a
 }
+
+fib n = if n < 1 then 1 else fib (n - 1) + fib (n - 2)

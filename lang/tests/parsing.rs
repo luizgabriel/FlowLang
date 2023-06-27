@@ -1,4 +1,7 @@
-use lang::parsing::{Expr, Ident, ParamsList, Statement};
+use std::borrow::Cow;
+
+use im::vector;
+use lang::parsing::{data::IdentConstructor, Expr, Ident, ParamsList, Statement};
 
 macro_rules! assert_parse_expr {
     ($input:expr, $expected:expr) => {
@@ -20,13 +23,13 @@ macro_rules! assert_parse_statement {
 
 #[test]
 fn test_parse_identifier() {
-    assert_parse_expr!("foo", Expr::name("foo"));
-    assert_parse_expr!("foo_bar", Expr::name("foo_bar"));
-    assert_parse_expr!("foo_bar_", Expr::name("foo_bar_"));
-    assert_parse_expr!("foo_bar_12", Expr::name("foo_bar_12"));
-    assert_parse_expr!("foobar", Expr::name("foobar"));
-    assert_parse_expr!("foobar12", Expr::name("foobar12"));
-    assert_parse_expr!("_foobar12", Expr::name("_foobar12"));
+    assert_parse_expr!("foo", Ident::name("foo").into());
+    assert_parse_expr!("foo_bar", Ident::name("foo_bar").into());
+    assert_parse_expr!("foo_bar_", Ident::name("foo_bar_").into());
+    assert_parse_expr!("foo_bar_12", Ident::name("foo_bar_12").into());
+    assert_parse_expr!("foobar", Ident::name("foobar").into());
+    assert_parse_expr!("foobar12", Ident::name("foobar12").into());
+    assert_parse_expr!("_foobar12", Ident::name("_foobar12").into());
 }
 
 #[test]
@@ -41,19 +44,22 @@ fn test_parse_literal() {
 
 #[test]
 fn test_function_application() {
-    assert_parse_expr!("foo bar", Expr::fnapp(Expr::name("foo"), Expr::name("bar")));
+    assert_parse_expr!(
+        "foo bar",
+        Expr::fnapp(Ident::name("foo").into(), Ident::name("bar").into())
+    );
     assert_parse_expr!(
         "foo bar baz",
         Expr::fnapp(
-            Expr::fnapp(Expr::name("foo"), Expr::name("bar")),
-            Expr::name("baz")
+            Expr::fnapp(Ident::name("foo").into(), Ident::name("bar").into()),
+            Ident::name("baz").into()
         )
     );
     assert_parse_expr!(
         "foo (bar baz)",
         Expr::fnapp(
-            Expr::name("foo"),
-            Expr::fnapp(Expr::name("bar"), Expr::name("baz"))
+            Ident::name("foo").into(),
+            Expr::fnapp(Ident::name("bar").into(), Ident::name("baz").into())
         )
     );
 }
@@ -63,8 +69,8 @@ fn test_operator_function_application() {
     assert_parse_expr!(
         "foo + bar",
         Expr::fnapp(
-            Expr::fnapp(Expr::operator("+"), Expr::name("foo")),
-            Expr::name("bar")
+            Expr::fnapp(Ident::op("+").into(), Ident::name("foo").into()),
+            Ident::name("bar").into()
         )
     );
 }
@@ -89,44 +95,64 @@ fn test_if_expr() {
 fn test_let_block() {
     assert_parse_statement!(
         "{ x = 2; x }",
-        Statement::Block(vec![
+        Statement::Block(vector![
             Statement::constant(Ident::name("x"), Expr::Int32(2)),
-            Expr::name("x").into(),
+            Ident::name("x").into(),
         ])
     );
     assert_parse_statement!(
         "{ x = 3;\n\ty = 4; x + y }",
-        Statement::Block(vec![
+        Statement::Block(vector![
             Statement::constant(Ident::name("x"), Expr::Int32(3)),
             Statement::constant(Ident::name("y"), Expr::Int32(4)),
-            Expr::fnapp2(Expr::operator("+"), Expr::name("x"), Expr::name("y")).into(),
+            Expr::fnapp2(
+                Ident::op("+").into(),
+                Ident::name("x").into(),
+                Ident::name("y").into()
+            )
+            .into(),
         ])
     );
     assert_parse_statement!(
         "{ x = 5;\n\ty = 6; \n\tx + y }",
-        Statement::Block(vec![
+        Statement::Block(vector![
             Statement::constant(Ident::name("x"), Expr::Int32(5)),
             Statement::constant(Ident::name("y"), Expr::Int32(6)),
-            Expr::fnapp2(Expr::operator("+"), Expr::name("x"), Expr::name("y")).into(),
+            Expr::fnapp2(
+                Ident::op("+").into(),
+                Ident::name("x").into(),
+                Ident::name("y").into()
+            )
+            .into(),
         ])
     );
     assert_parse_statement!(
         "{ add5 x = 5 + x; \ntimes2 x = 2 * x;\n\tadd5 >> times2 }",
-        Statement::Block(vec![
+        Statement::Block(vector![
             Statement::function(
                 Ident::name("add5"),
-                ParamsList::new(vec![Ident::name("x")]),
-                Expr::fnapp2(Expr::operator("+"), Expr::Int32(5), Expr::name("x")).into()
+                ParamsList::new(vector![Ident::name("x")]),
+                Expr::fnapp2(
+                    Ident::op("+").into(),
+                    Expr::Int32(5),
+                    Ident::name("x").into()
+                )
+                .into()
             ),
             Statement::function(
                 Ident::name("times2"),
-                ParamsList::new(vec![Ident::name("x")]),
-                Expr::fnapp2(Expr::operator("*"), Expr::Int32(2), Expr::name("x")).into()
+                ParamsList::new(vector![Ident::name("x")]),
+                Expr::fnapp2(
+                    Ident::op("*").into(),
+                    Expr::Int32(2),
+                    Ident::name("x").into()
+                )
+                .into()
             ),
             Expr::fnapp2(
-                Expr::operator(">>"),
-                Expr::name("add5"),
-                Expr::name("times2")
+                Ident::op(">>").into(),
+                Ident::name("add5").into(),
+                Ident::name("times2").into(),
             )
             .into(),
         ])
@@ -139,8 +165,13 @@ fn test_func_decl() {
         "add1 x y = x + y",
         Statement::function(
             Ident::name("add1"),
-            ParamsList::new(vec![Ident::name("x"), Ident::name("y")]),
-            Expr::fnapp2(Expr::operator("+"), Expr::name("x"), Expr::name("y")).into()
+            ParamsList::new(vector![Ident::name("x"), Ident::name("y")]),
+            Expr::fnapp2(
+                Ident::op("+").into(),
+                Ident::name("x").into(),
+                Ident::name("y").into()
+            )
+            .into()
         )
     );
 
@@ -148,11 +179,16 @@ fn test_func_decl() {
         "add2 x y = \n{ k = x; g = y; k + g }",
         Statement::function(
             Ident::name("add2"),
-            ParamsList::new(vec![Ident::name("x"), Ident::name("y")]),
-            Statement::Block(vec![
-                Statement::constant(Ident::name("k"), Expr::name("x")),
-                Statement::constant(Ident::name("g"), Expr::name("y")),
-                Expr::fnapp2(Expr::operator("+"), Expr::name("k"), Expr::name("g")).into()
+            ParamsList::new(vector![Ident::name("x"), Ident::name("y")]),
+            Statement::Block(vector![
+                Statement::constant(Ident::name("k"), Ident::name("x").into()),
+                Statement::constant(Ident::name("g"), Ident::name("y").into()),
+                Expr::fnapp2(
+                    Ident::op("+").into(),
+                    Ident::name("k").into(),
+                    Ident::name("g").into()
+                )
+                .into()
             ]),
         )
     );

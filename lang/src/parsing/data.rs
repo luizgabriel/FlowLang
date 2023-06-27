@@ -1,20 +1,37 @@
-use std::path::PathBuf;
+use std::{borrow::Cow, path::PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ident {
-    Name(String),
-    Operator(String),
+    Name(Cow<'static, str>),
+    Operator(Cow<'static, str>),
+}
+
+pub trait IdentConstructor<T> {
+    fn name(name: T) -> Self;
+    fn op(op: T) -> Self;
+}
+
+impl IdentConstructor<String> for Ident {
+    fn name(name: String) -> Self {
+        Ident::Name(Cow::Owned(name))
+    }
+
+    fn op(op: String) -> Self {
+        Ident::Operator(Cow::Owned(op))
+    }
+}
+
+impl IdentConstructor<&'static str> for Ident {
+    fn name(name: &'static str) -> Self {
+        Ident::Name(Cow::Borrowed(name))
+    }
+
+    fn op(op: &'static str) -> Self {
+        Ident::Operator(Cow::Borrowed(op))
+    }
 }
 
 impl Ident {
-    pub fn name(name: &str) -> Self {
-        Ident::Name(name.to_string())
-    }
-
-    pub fn op(op: &str) -> Self {
-        Ident::Operator(op.to_string())
-    }
-
     pub fn as_str(&self) -> &str {
         match self {
             Ident::Name(name) => name,
@@ -25,12 +42,18 @@ impl Ident {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParamsList {
-    params: Vec<Ident>,
+    params: im::Vector<Ident>,
 }
 
 impl ParamsList {
-    pub fn new(params: Vec<Ident>) -> Self {
+    pub fn new(params: im::Vector<Ident>) -> Self {
         ParamsList { params }
+    }
+
+    pub fn from_vec(params: Vec<Ident>) -> Self {
+        ParamsList {
+            params: params.into(),
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -50,14 +73,14 @@ impl ParamsList {
     }
 
     pub fn split_first(&self) -> Option<(Ident, ParamsList)> {
-        let (head, tail) = self.params.split_first()?;
-        Some((head.clone(), Self::new(tail.to_vec())))
+        let (head, tail) = self.params.clone().split_at(1);
+        Some((head.head()?.clone(), Self::new(tail)))
     }
 }
 
 impl IntoIterator for ParamsList {
     type Item = Ident;
-    type IntoIter = <Vec<Ident> as IntoIterator>::IntoIter;
+    type IntoIter = <im::Vector<Ident> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.params.into_iter()
@@ -91,10 +114,14 @@ pub enum Expr {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModuleName(Vec<Ident>);
+pub struct ModuleName(im::Vector<Ident>);
 
 impl ModuleName {
-    pub fn new(names: Vec<Ident>) -> Self {
+    pub fn from_vec(names: Vec<Ident>) -> Self {
+        ModuleName(names.into())
+    }
+
+    pub fn new(names: im::Vector<Ident>) -> Self {
         ModuleName(names)
     }
 
@@ -112,7 +139,7 @@ impl ModuleName {
 
 impl IntoIterator for ModuleName {
     type Item = Ident;
-    type IntoIter = <Vec<Ident> as IntoIterator>::IntoIter;
+    type IntoIter = <im::Vector<Ident> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -132,7 +159,7 @@ pub enum Statement {
         params: ParamsList,
         body: Box<Statement>,
     },
-    Block(Vec<Statement>),
+    Block(im::Vector<Statement>),
 }
 
 impl Statement {
@@ -154,14 +181,6 @@ impl Statement {
 }
 
 impl Expr {
-    pub fn name(name: &str) -> Expr {
-        Expr::Identifier(Ident::name(name))
-    }
-
-    pub fn operator(op: &str) -> Expr {
-        Expr::Identifier(Ident::op(op))
-    }
-
     pub fn fnapp(func: Expr, arg: Expr) -> Expr {
         Expr::FunctionApplication(Box::new(func), Box::new(arg))
     }
@@ -188,12 +207,18 @@ impl Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
-    statements: Vec<Statement>,
+    statements: im::Vector<Statement>,
 }
 
 impl Program {
-    pub fn new(statements: Vec<Statement>) -> Self {
+    pub fn new(statements: im::Vector<Statement>) -> Self {
         Program { statements }
+    }
+
+    pub fn from_vec(statements: Vec<Statement>) -> Self {
+        Program {
+            statements: statements.into(),
+        }
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Statement> {
@@ -203,7 +228,7 @@ impl Program {
 
 impl IntoIterator for Program {
     type Item = Statement;
-    type IntoIter = <Vec<Statement> as IntoIterator>::IntoIter;
+    type IntoIter = <im::Vector<Statement> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.statements.into_iter()
@@ -240,5 +265,17 @@ impl From<Expr> for Statement {
 impl From<Box<Expr>> for Box<Statement> {
     fn from(expr: Box<Expr>) -> Self {
         Box::new(Statement::expr(*expr))
+    }
+}
+
+impl From<Ident> for Expr {
+    fn from(ident: Ident) -> Self {
+        Expr::Identifier(ident)
+    }
+}
+
+impl From<Ident> for Statement {
+    fn from(ident: Ident) -> Self {
+        Statement::expr(Expr::Identifier(ident))
     }
 }

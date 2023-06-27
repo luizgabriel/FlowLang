@@ -1,14 +1,16 @@
 use crate::Environment;
-use rpds::HashTrieMap;
 
 use crate::evaluation::builtin::BuiltInFunc;
 use crate::evaluation::data::Value;
 use crate::evaluation::Evaluator;
+use crate::parsing::data::IdentConstructor;
 use crate::parsing::{parse_program, Ident, ParamsList};
+
+use im::vector;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ValueEnvironment {
-    variables: HashTrieMap<Ident, Value>,
+    variables: im::HashMap<Ident, Value>,
 }
 
 impl Environment for ValueEnvironment {
@@ -20,7 +22,7 @@ impl Environment for ValueEnvironment {
 
     fn set(&self, identifier: Ident, value: Self::Value) -> Self {
         ValueEnvironment {
-            variables: self.variables.insert(identifier, value),
+            variables: self.variables.update(identifier, value),
         }
     }
 }
@@ -30,14 +32,14 @@ macro_rules! builtin {
     ($name:ident : $($param:ident),*) => {
         Value::BuiltInFunction {
             name: BuiltInFunc::$name,
-            params: ParamsList::new(vec![$(Ident::name(stringify!($param))),*]),
+            params: ParamsList::new(vector![$(Ident::name(stringify!($param))),*]),
             scope: ValueEnvironment::default(),
         }
     };
 }
 
 impl ValueEnvironment {
-    pub fn define_builtins(&self) -> Self {
+    pub fn define_builtins(self) -> Self {
         self.set(Ident::op("+"), builtin!(Add: lhs, rhs))
             .set(Ident::op("-"), builtin!(Sub: lhs, rhs))
             .set(Ident::op("*"), builtin!(Mul: lhs, rhs))
@@ -54,10 +56,10 @@ impl ValueEnvironment {
             .set(Ident::name("powi"), builtin!(PowI: lhs, rhs))
     }
 
-    pub fn import_std(&self) -> Self {
-        parse_program("use std")
+    pub fn import_std(self) -> Self {
+        parse_program("import std")
             .expect("Could not parse Standard Library")
-            .eval(self.clone())
+            .eval(self)
             .expect("Could not evaluate Standard Library")
             .1
     }
