@@ -60,6 +60,30 @@ import examples::math
 eq_root1 1.0 3.0 2.0
 ```
 
+### Recursive Functions
+
+```hs
+fib n = if n < 1 then 1 else fib (n - 1) + fib (n - 2)
+```
+
+### Block Expressions
+
+The last statement is the return value.
+
+```hs
+x = {
+    a = 1;
+    b = 2;
+    a + b
+}
+
+some_function x y = {
+    a = x * x;
+    b = y * y;
+    a + b
+}
+```
+
 ## Getting Started
 
 Install the **Rust** programming language:
@@ -76,5 +100,5 @@ cd FlowLang
 Run the REPL (Read Evaluate Parse Loop) with:
 
 ```sh
-cargo run --bin repl -q
+cargo run -p repl -q
 ```
