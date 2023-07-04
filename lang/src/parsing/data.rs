@@ -46,11 +46,7 @@ pub struct ParamsList {
 }
 
 impl ParamsList {
-    pub fn new(params: im::Vector<Ident>) -> Self {
-        ParamsList { params }
-    }
-
-    pub fn from_vec(params: Vec<Ident>) -> Self {
+    pub fn new(params: impl Into<im::Vector<Ident>>) -> Self {
         ParamsList {
             params: params.into(),
         }
@@ -89,7 +85,7 @@ impl IntoIterator for ParamsList {
 
 impl FromIterator<Ident> for ParamsList {
     fn from_iter<T: IntoIterator<Item = Ident>>(iter: T) -> Self {
-        ParamsList::new(iter.into_iter().collect())
+        ParamsList::new(iter.into_iter().collect::<Vec<_>>())
     }
 }
 
@@ -117,12 +113,8 @@ pub enum Expr {
 pub struct ModuleName(im::Vector<Ident>);
 
 impl ModuleName {
-    pub fn from_vec(names: Vec<Ident>) -> Self {
+    pub fn new(names: impl Into<im::Vector<Ident>>) -> Self {
         ModuleName(names.into())
-    }
-
-    pub fn new(names: im::Vector<Ident>) -> Self {
-        ModuleName(names)
     }
 
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = &Ident> {
@@ -211,11 +203,7 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn new(statements: im::Vector<Statement>) -> Self {
-        Program { statements }
-    }
-
-    pub fn from_vec(statements: Vec<Statement>) -> Self {
+    pub fn new(statements: impl Into<im::Vector<Statement>>) -> Self {
         Program {
             statements: statements.into(),
         }
@@ -237,7 +225,7 @@ impl IntoIterator for Program {
 
 impl FromIterator<Statement> for Program {
     fn from_iter<T: IntoIterator<Item = Statement>>(iter: T) -> Self {
-        Program::new(iter.into_iter().collect())
+        Program::new(iter.into_iter().collect::<Vec<_>>())
     }
 }
 

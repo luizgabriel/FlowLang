@@ -215,7 +215,7 @@ where
 {
     context(
         "parameter list",
-        map(many1(ws0(identifier)), ParamsList::from_vec),
+        map(many1(ws0(identifier)), ParamsList::new),
     )(input)
 }
 
@@ -329,7 +329,7 @@ where
 {
     context(
         "module name",
-        map(separated_list1(tag("::"), identifier), ModuleName::from_vec),
+        map(separated_list1(tag("::"), identifier), ModuleName::new),
     )(input)
 }
 
@@ -375,5 +375,5 @@ where
         multispace0,
     );
 
-    context("module", map(expr_block, Program::from_vec))(input)
+    context("module", map(expr_block, Program::new))(input)
 }
